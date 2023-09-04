@@ -1,0 +1,363 @@
+<!doctype html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<script>
+
+//--------------------------------------------------------------
+let vertexShaderSrc = `#version 300 es
+
+in vec4 pos;
+in vec4 color;
+
+out vec4 f_color;
+
+void main() {
+    gl_Position = pos;
+    f_color = color;
+}
+`
+
+//--------------------------------------------------------------
+let fragmentShaderSrc = `#version 300 es
+precision highp float;
+
+out vec4 FragColor;
+in vec4 f_color;
+
+void main() {
+    FragColor = f_color;
+}
+`
+
+//--------------------------------------------------------------
+let mainProgram = {
+    shaders: [
+        { type: "VERTEX_SHADER", src: vertexShaderSrc, },
+        { type: "FRAGMENT_SHADER", src: fragmentShaderSrc, }
+    ],
+    
+    uniforms: {
+    },
+    
+    vertexSpecification: [
+        // attributes, located in the same buffer
+        // {
+        //     type: "FLOAT", // type of values in buffer
+        //     attributes: [
+        //         {
+        //             name: "AttributeName",
+        //             sizeUnits: 4,
+        //             offsetUnits: 0 //  OPTIONAL, offset in units (not in bytes), default automatic
+        //             strideUnits: 0 //  OPTIONAL, stride in units (not in bytes), default automatic over all attributes in buffer
+        //             normalized: 0  //  OPTIONAL, default false
+        //         },
+        //     ]
+        //     buffer:        //  OPTIONAL, explicit buffer specification, default automatic buffer allocation
+        // },
+        {
+            type: "FLOAT",
+            attributes: [
+                {
+                    name: "pos",
+                    sizeUnits: 4,
+                },
+                {
+                    name: "color",
+                    sizeUnits: 4,
+                },
+            ]
+        },
+    ]
+}
+
+//--------------------------------------------------------------
+class BufferBuilder {
+    constructor(program) {
+        if (!program.ready) throw new Error('Program is not compiled yet')
+        
+        this.program = program
+        this.size = 0
+        this.vertexArrays = program.vertexSpecification.map(x => new Array)
+        
+        this.indexBuffer = program.gl.createBuffer()
+        this.drawcalls = {}
+        this.drawcall_suffix = ''
+    }
+    
+    clear() {
+        for ( let vertexArray of this.vertexArrays ) vertexArray.length = 0
+        
+        this.size = 0
+        this.drawcalls = {}
+    }
+    
+    addVertex(vertex, index) {
+        if ( index === undefined ) {
+            index = this.size
+        }
+        for ( let i = 0; i < this.program.vertexSpecification.length; i++ ) {
+            let vertexArray = this.vertexArrays[i]
+            for ( const attr of this.program.vertexSpecification[i].attributes ) {
+                let vertexAttr = vertex[attr.name]
+                if ( vertexAttr===undefined ) throw new Error(`"${attr.name}" required in vertex specification`)
+                if ( vertexAttr[0]===undefined ) vertexAttr = [vertexAttr]
+                if ( vertexAttr.length != attr.sizeUnits) {
+                    throw new Error(`"${attr.name}" attribute must be of lenth ${attr.sizeUnits}`)
+                }
+                for ( let k = 0; k < attr.sizeUnits; k++ ) {
+                    vertexArray[attr.offsetUnits + index*attr.strideUnits + k] = vertexAttr[k]
+                }
+            }
+        }
+        
+        if ( index >= this.size ) this.size = index + 1;
+        
+        return index
+    }
+    
+    addIndices(type, ...indices) {
+        if ( !this.drawcalls[type + this.drawcall_suffix] ) {
+            this.drawcalls[type + this.drawcall_suffix] = {
+                indices: [],
+            }
+        }
+        
+        this.drawcalls[type + this.drawcall_suffix].indices.push(...indices)
+    }
+    
+    uploadData() {
+        let gl = this.program.gl
+        
+        gl.useProgram(this.program.program)
+        
+        for ( let i = 0; i < this.program.vertexSpecification.length; i++ ) {
+            let spec = this.program.vertexSpecification[i]
+            
+            gl.bindBuffer(gl.ARRAY_BUFFER, spec.buffer)
+            gl.bufferData(
+                gl.ARRAY_BUFFER,
+                new dataTypes[spec.type].arrayType(this.vertexArrays[i]),
+                gl.STATIC_DRAW
+            )
+        }
+        
+        let pos = 0
+        let dataType = 'UNSIGNED_SHORT'
+        for ( let drawcall of Object.values(this.drawcalls) ) {
+            drawcall.indexBuffer = this.indexBuffer
+            drawcall.dataType = dataType
+            drawcall.start = pos
+            drawcall.count = drawcall.indices.length
+            pos += drawcall.count
+        }
+        
+        let allIndices = new dataTypes[dataType].arrayType(pos)
+        for ( let drawcall of Object.values(this.drawcalls) ) {
+            allIndices.set(drawcall.indices, drawcall.start)
+        }
+        
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer)
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, allIndices, gl.STATIC_DRAW)
+        
+        // this.clear()
+        return this.drawcalls
+    }
+}
+
+//--------------------------------------------------------------
+function resolveConstant(gl, value) {
+    return typeof value == 'string' ? gl[value] : value
+}
+
+//--------------------------------------------------------------
+const dataTypes = {
+    BYTE:           { size: 1, arrayType: Int8Array },
+    UNSIGNED_BYTE:  { size: 1, arrayType: Uint8Array },
+    SHORT:          { size: 2, arrayType: Int16Array },
+    UNSIGNED_SHORT: { size: 2, arrayType: Uint16Array },
+    INT:            { size: 4, arrayType: Int32Array },
+    UNSIGNED_INT:   { size: 4, arrayType: Uint32Array },
+    FLOAT:          { size: 4, arrayType: Float32Array },
+}
+
+//--------------------------------------------------------------
+function buildProgram(gl, program) {
+    program.program = gl.createProgram()
+    
+    for ( let shader of program.shaders ) {
+        shader.shader = gl.createShader(resolveConstant(gl, shader.type))
+        gl.shaderSource(shader.shader, shader.src)
+        gl.compileShader(shader.shader)
+        if ( !gl.getShaderParameter(shader.shader, gl.COMPILE_STATUS) ) {
+            console.log(`Compile error: ${gl.getShaderInfoLog(shader.shader)}`)
+        }
+        gl.attachShader(program.program, shader.shader)
+    }
+    
+    gl.linkProgram(program.program)
+    
+    for ( let shader of program.shaders ) {
+        gl.deleteShader(shader.shader)
+        delete shader.shader
+    }
+    
+    if(!gl.getProgramParameter(program.program, gl.LINK_STATUS)) {
+        const shaderError = gl.getProgramInfoLog(program.program)
+        throw new Error(`Shader error: ${shaderError}`)
+    }
+    
+    for ( let spec of program.vertexSpecification ) {
+        if ( !spec.buffer ) spec.buffer = gl.createBuffer()
+        
+        gl.bindBuffer(gl.ARRAY_BUFFER, spec.buffer)
+        const unitSize = dataTypes[spec.type].size
+        let strideUnits = spec.attributes.reduce((accum, attr) => accum + attr.sizeUnits, 0)
+        var offsetUnits = 0
+        
+        for ( let attr of spec.attributes ) {
+            attr.location = gl.getAttribLocation(program.program, attr.name)
+            if ( attr.location == -1 ) throw new Error(`Vertex attribut name not found: ${attr.name}`)
+            
+            if ( attr.offsetUnits === undefined ) attr.offsetUnits = offsetUnits
+            if ( attr.strideUnits === undefined ) attr.strideUnits = strideUnits
+            
+            gl.vertexAttribPointer(
+                attr.location,
+                attr.sizeUnits,
+                resolveConstant(gl, spec.type),
+                attr.normalized,
+                attr.strideUnits * unitSize,
+                attr.offsetUnits * unitSize
+            )
+            gl.enableVertexAttribArray(attr.location)
+            offsetUnits += attr.sizeUnits
+        }
+    }
+    
+    for ( let uniform in program.uniforms ) {
+        program.uniforms[uniform] = gl.getUniformLocation(program.program, uniform)
+        if ( program.uniforms[uniform] === null ) throw new Error(`Uniform not found: ${uniform}`)
+    }
+    
+    program.gl = gl
+    program.ready = true
+}
+
+//--------------------------------------------------------------
+
+
+//============================================================
+// Matrix functions
+
+//--------------------------------------------------------------
+function frustum(left, right, bottom, top, near, far) {
+    let mat = new Float32Array(16)
+    
+    mat[0] = 2 * near / (right - left)
+    mat[1] = 0
+    mat[2] = 0
+    mat[3] = 0
+    
+    mat[4] = 0
+    mat[5] = 2 * near / (top - bottom)
+    mat[6] = 0
+    mat[7] = 0
+    
+    mat[8] = (right + left) / (right - left)
+    mat[9] = (top + bottom) / (top - bottom)
+    mat[10] = - (far + near) / (far - near)
+    mat[11] = -1
+    
+    mat[12] = 0
+    mat[13] = 0
+    mat[14] = - 2 * far * near / (far - near)
+    mat[15] = 0
+    
+    return mat
+}
+
+//--------------------------------------------------------------
+function mulMatrix(mat1, mat2) {
+    let mat = new Float32Array(16)
+    
+    for (var row=0; row<4; row++) {
+        for (var col=0; col<16; col+=4) {
+            mat[row+col] = (
+                mat1[row]      * mat2[col] + 
+                mat1[row + 4]  * mat2[col + 1] + 
+                mat1[row + 8]  * mat2[col + 2] + 
+                mat1[row + 12] * mat2[col + 3]
+            )
+        }
+    }
+    
+    return mat
+}
+
+// End of matrix functions
+//============================================================
+
+class Scene {
+    constructor(program) {
+        let gl = program.gl
+        
+        let builder = new BufferBuilder(mainProgram)
+        let v1 = builder.addVertex({ pos: [-0.5, -0.5, 0, 1], color: [1, 0, 0, 1] })
+        let v2 = builder.addVertex({ pos: [0.5, -0.5, 0, 1], color: [1, 0, 0, 1] })
+        let v3 = builder.addVertex({ pos: [0.5, 0.5, 0, 1], color: [1, 0, 0, 1] })
+        
+        builder.addIndices('TRIANGLES', v1, v2, v3)
+        
+        this.drawcalls = builder.uploadData()
+        this.gl = gl
+    }
+    
+    draw() {
+        let gl = this.gl
+        
+        let drawcall = this.drawcalls['TRIANGLES']
+        console.log(drawcall)
+        gl.useProgram(mainProgram.program)
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, drawcall.indexBuffer)
+        gl.drawElements(
+            gl.TRIANGLES,
+            drawcall.count,
+            gl[drawcall.dataType],
+            drawcall.start * dataTypes[drawcall.dataType].size
+        )
+    }
+}
+
+//--------------------------------------------------------------
+function setupGL(canvas) {
+    let gl = canvas.getContext("webgl2")
+    console.log(gl)
+    gl.clearColor(0.0, 0.0, 0.0, 1.0)
+    gl.enable(gl.DEPTH_TEST)
+    return gl
+}
+
+//--------------------------------------------------------------
+function init() {
+    let gl = setupGL(document.querySelector('#canvas'))
+    
+    buildProgram(gl, mainProgram)
+    
+    let scene = new Scene(mainProgram)
+    
+    requestAnimationFrame(()=>{
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+        scene.draw()
+    })
+}
+
+//--------------------------------------------------------------
+</script>
+
+</head>
+<body onload="init()">
+    <canvas id="canvas" width="1000" height="750" oncontextmenu="return false"></canvas>
+</body>
+</html>
