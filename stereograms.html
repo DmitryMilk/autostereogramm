@@ -11,10 +11,12 @@ let vertexShaderSrc = `#version 300 es
 in vec4 pos;
 in vec4 color;
 
+uniform mat4 projectionMatrix;
+
 out vec4 f_color;
 
 void main() {
-    gl_Position = pos;
+    gl_Position = projectionMatrix * pos;
     f_color = color;
 }
 `
@@ -39,6 +41,7 @@ let mainProgram = {
     ],
     
     uniforms: {
+        projectionMatrix: null,
     },
     
     vertexSpecification: [
@@ -251,6 +254,14 @@ function buildProgram(gl, program) {
 //============================================================
 // Matrix functions
 
+
+//--------------------------------------------------------------
+function identity() {
+    let mat = new Float32Array(16)
+    mat[0] = mat[5] = mat[10] = mat[15] = 1.0
+    return mat
+}
+
 //--------------------------------------------------------------
 function frustum(left, right, bottom, top, near, far) {
     let mat = new Float32Array(16)
@@ -303,29 +314,54 @@ class Scene {
     constructor(program) {
         let gl = program.gl
         
+        this.distance = 2000        
+        
         let builder = new BufferBuilder(mainProgram)
-        let v1 = builder.addVertex({ pos: [-0.5, -0.5, 0, 1], color: [1, 0, 0, 1] })
-        let v2 = builder.addVertex({ pos: [0.5, -0.5, 0, 1], color: [1, 0, 0, 1] })
-        let v3 = builder.addVertex({ pos: [0.5, 0.5, 0, 1], color: [1, 0, 0, 1] })
+        let v1 = builder.addVertex({ pos: [-100, -100, 0, 1], color: [1, 0, 0, 1] })
+        let v2 = builder.addVertex({ pos: [100, -100, 0, 1], color: [0, 1, 0, 1] })
+        let v3 = builder.addVertex({ pos: [100, 100, 0, 1], color: [0, 0, 1, 1] })
         
         builder.addIndices('TRIANGLES', v1, v2, v3)
         
         this.drawcalls = builder.uploadData()
+        
         this.gl = gl
+    }
+    
+    buildProjectionMatrix() {
+        let gl = this.gl
+        let frustumMatrix = frustum(
+            -gl.canvas.width/2,
+            gl.canvas.width/2,
+            -gl.canvas.height/2,
+            gl.canvas.height/2,
+            this.distance,
+            this.distance + 10000
+        )
+        
+        let shiftMatrix = identity()
+        shiftMatrix[14] = -this.distance
+        return mulMatrix(frustumMatrix, shiftMatrix)
     }
     
     draw() {
         let gl = this.gl
         
-        let drawcall = this.drawcalls['TRIANGLES']
-        console.log(drawcall)
         gl.useProgram(mainProgram.program)
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, drawcall.indexBuffer)
+        
+        gl.uniformMatrix4fv(
+            mainProgram.uniforms.projectionMatrix,
+            false,
+            this.buildProjectionMatrix()
+        )
+        
+        let triangles = this.drawcalls['TRIANGLES']
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangles.indexBuffer)
         gl.drawElements(
             gl.TRIANGLES,
-            drawcall.count,
-            gl[drawcall.dataType],
-            drawcall.start * dataTypes[drawcall.dataType].size
+            triangles.count,
+            gl[triangles.dataType],
+            triangles.start * dataTypes[triangles.dataType].size
         )
     }
 }
@@ -333,7 +369,6 @@ class Scene {
 //--------------------------------------------------------------
 function setupGL(canvas) {
     let gl = canvas.getContext("webgl2")
-    console.log(gl)
     gl.clearColor(0.0, 0.0, 0.0, 1.0)
     gl.enable(gl.DEPTH_TEST)
     return gl
