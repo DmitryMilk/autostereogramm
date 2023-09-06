@@ -11,12 +11,12 @@ let vertexShaderSrc = `#version 300 es
 in vec4 pos;
 in vec4 color;
 
-uniform mat4 projectionMatrix;
+uniform mat4 projectionViewMatrix;
 
 out vec4 f_color;
 
 void main() {
-    gl_Position = projectionMatrix * pos;
+    gl_Position = projectionViewMatrix * pos;
     f_color = color;
 }
 `
@@ -41,7 +41,7 @@ let mainProgram = {
     ],
     
     uniforms: {
-        projectionMatrix: null,
+        projectionViewMatrix: null,
     },
     
     vertexSpecification: [
@@ -307,20 +307,56 @@ function mulMatrix(mat1, mat2) {
     return mat
 }
 
+//--------------------------------------------------------------
+function translateInplace(mat, dx, dy, dz) {
+    mat[12] += mat[0]*dx + mat[4]*dy + mat[8]*dz
+    mat[13] += mat[1]*dx + mat[5]*dy + mat[9]*dz
+    mat[14] += mat[2]*dx + mat[6]*dy + mat[10]*dz
+    mat[15] += mat[3]*dx + mat[7]*dy + mat[11]*dz
+}
+
+//--------------------------------------------------------------
+function rotateInplace(mat, axis1, axis2, angle) {
+    let index1 = axis1 * 4
+    let index2 = axis2 * 4
+    let c = Math.cos(angle)
+    let s = Math.sin(angle)
+    for ( var i=0; i<4; i++ ) {
+        let temp = mat[index1]*c + mat[index2]*s;
+        mat[index2] = mat[index2]*c - mat[index1]*s;
+        mat[index1] = temp;
+        index1++;
+        index2++;
+    }
+}
+
+
+function printMatrix(m) {
+    console.log('---------------')
+    for ( let i of [0, 1, 2, 3] ) {
+        console.log(m[i], m[i+4], m[i+8], m[i+12])
+    }
+}
+
 // End of matrix functions
 //============================================================
 
 class Scene {
     constructor(program) {
-        let gl = program.gl
+        this.zNear = 2000
+        this.zFar = 10000
         
-        this.distance = 2000        
+        this.distance = this.zNear + 500
+        this.alpha = 0
+        this.beta = 0
+        
+        let gl = program.gl
         
         let builder = new BufferBuilder(mainProgram)
         let v1 = builder.addVertex({ pos: [-100, -100, 0, 1], color: [1, 0, 0, 1] })
         let v2 = builder.addVertex({ pos: [100, -100, 0, 1], color: [0, 1, 0, 1] })
         let v3 = builder.addVertex({ pos: [100, 100, 0, 1], color: [0, 0, 1, 1] })
-        
+
         builder.addIndices('TRIANGLES', v1, v2, v3)
         
         this.drawcalls = builder.uploadData()
@@ -330,18 +366,16 @@ class Scene {
     
     buildProjectionMatrix() {
         let gl = this.gl
-        let frustumMatrix = frustum(
+        let projectionMatrix = frustum(
             -gl.canvas.width/2,
             gl.canvas.width/2,
             -gl.canvas.height/2,
             gl.canvas.height/2,
-            this.distance,
-            this.distance + 10000
+            this.zNear,
+            this.zFar
         )
         
-        let shiftMatrix = identity()
-        shiftMatrix[14] = -this.distance
-        return mulMatrix(frustumMatrix, shiftMatrix)
+        return projectionMatrix
     }
     
     draw() {
@@ -349,20 +383,26 @@ class Scene {
         
         gl.useProgram(mainProgram.program)
         
+        let pvm = this.buildProjectionMatrix()
+        translateInplace(pvm, 0, 0, -this.distance)
+        rotateInplace(pvm, 1, 2, this.beta)
+        rotateInplace(pvm, 2, 0, this.alpha)
+        
         gl.uniformMatrix4fv(
-            mainProgram.uniforms.projectionMatrix,
+            mainProgram.uniforms.projectionViewMatrix,
             false,
-            this.buildProjectionMatrix()
+            pvm
         )
         
-        let triangles = this.drawcalls['TRIANGLES']
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangles.indexBuffer)
-        gl.drawElements(
-            gl.TRIANGLES,
-            triangles.count,
-            gl[triangles.dataType],
-            triangles.start * dataTypes[triangles.dataType].size
-        )
+        for ( const [dc_type, drawcall] of Object.entries(this.drawcalls) ) {
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, drawcall.indexBuffer)
+            gl.drawElements(
+                gl[dc_type],
+                drawcall.count,
+                gl[drawcall.dataType],
+                drawcall.start * dataTypes[drawcall.dataType].size
+            )
+        }
     }
 }
 
@@ -371,21 +411,58 @@ function setupGL(canvas) {
     let gl = canvas.getContext("webgl2")
     gl.clearColor(0.0, 0.0, 0.0, 1.0)
     gl.enable(gl.DEPTH_TEST)
+    gl.enable(gl.CULL_FACE)
     return gl
 }
 
 //--------------------------------------------------------------
 function init() {
-    let gl = setupGL(document.querySelector('#canvas'))
+    let canvas = document.querySelector('#canvas')
+    let gl = setupGL(canvas)
     
     buildProgram(gl, mainProgram)
     
     let scene = new Scene(mainProgram)
     
-    requestAnimationFrame(()=>{
+    function draw() {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
         scene.draw()
-    })
+    }
+    
+    canvas.onwheel = (evt) => {
+        const distCoef = 1.01
+        if ( evt.wheelDelta > 0 ) scene.distance /= distCoef
+        else if ( evt.wheelDelta < 0 ) scene.distance *= distCoef
+        requestAnimationFrame(draw)
+    }
+    
+    canvas.onpointerdown = (downEvt) => {
+        canvas.setPointerCapture(downEvt.pointerId)
+        
+        let startAlpha = scene.alpha
+        let startBeta = scene.beta
+        
+        canvas.onpointermove = (moveEvt) => {
+            const xSensitivity = 0.015
+            const ySensitivity = 0.015
+            
+            scene.alpha = startAlpha + (moveEvt.x - downEvt.x) * xSensitivity
+            while ( scene.alpha < -Math.PI ) scene.alpha += Math.PI*2
+            while ( scene.alpha > Math.PI ) scene.alpha -= Math.PI*2
+            scene.beta = startBeta + (moveEvt.y - downEvt.y) * ySensitivity
+            if ( scene.beta < -Math.PI*0.5 ) scene.beta = -Math.PI*0.5
+            if ( scene.beta > Math.PI*0.5 ) scene.beta = Math.PI*0.5
+            
+            requestAnimationFrame(draw)
+        }
+    }
+    
+    canvas.onpointerup = (evt) => {
+        canvas.onpointermove = null
+        canvas.releasePointerCapture(evt.pointerId)
+    }
+    
+    requestAnimationFrame(draw)
 }
 
 //--------------------------------------------------------------
