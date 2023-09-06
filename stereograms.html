@@ -5,6 +5,11 @@
 
 <script>
 
+screenWidthMillis = 600
+distanceToScreenMillis = 1000
+
+const depthMillis = 2000
+
 //--------------------------------------------------------------
 let vertexShaderSrc = `#version 300 es
 
@@ -343,36 +348,39 @@ function printMatrix(m) {
 
 class Scene {
     constructor(program) {
-        this.zNear = 2000
-        this.zFar = 10000
-        
-        this.distance = this.zNear + 500
-        this.alpha = 0
-        this.beta = 0
-        
         let gl = program.gl
+        this.gl = gl
+        
+        this.initParams()
         
         let builder = new BufferBuilder(mainProgram)
-        let v1 = builder.addVertex({ pos: [-100, -100, 0, 1], color: [1, 0, 0, 1] })
-        let v2 = builder.addVertex({ pos: [100, -100, 0, 1], color: [0, 1, 0, 1] })
-        let v3 = builder.addVertex({ pos: [100, 100, 0, 1], color: [0, 0, 1, 1] })
-
+        let v1 = builder.addVertex({ pos: [-50, -50, 0, 1], color: [1, 0, 0, 1] })
+        let v2 = builder.addVertex({ pos: [50, -50, 0, 1], color: [0, 1, 0, 1] })
+        let v3 = builder.addVertex({ pos: [50, 50, 0, 1], color: [0, 0, 1, 1] })
+        
         builder.addIndices('TRIANGLES', v1, v2, v3)
         
         this.drawcalls = builder.uploadData()
-        
-        this.gl = gl
+    }
+    
+    initParams() {
+        this.distance = distanceToScreenMillis + depthMillis / 2
+        this.alpha = 0
+        this.beta = 0
     }
     
     buildProjectionMatrix() {
         let gl = this.gl
+        
+        let millisPerPixel = screenWidthMillis / screen.width
+        
         let projectionMatrix = frustum(
-            -gl.canvas.width/2,
-            gl.canvas.width/2,
-            -gl.canvas.height/2,
-            gl.canvas.height/2,
-            this.zNear,
-            this.zFar
+            -gl.canvas.width * millisPerPixel / 2,
+            gl.canvas.width * millisPerPixel / 2,
+            -gl.canvas.height * millisPerPixel / 2,
+            gl.canvas.height * millisPerPixel / 2,
+            distanceToScreenMillis,
+            distanceToScreenMillis + depthMillis
         )
         
         return projectionMatrix
@@ -416,7 +424,17 @@ function setupGL(canvas) {
 }
 
 //--------------------------------------------------------------
+function updateViewParams() {
+    let screenWidthElement = document.querySelector('#screenWidth')
+    let distanceToScreenElement = document.querySelector('#distanceToScreen')
+    screenWidthElement.value = screenWidthMillis
+    distanceToScreenElement.value = distanceToScreenMillis
+}
+
+//--------------------------------------------------------------
 function init() {
+    updateViewParams()
+    
     let canvas = document.querySelector('#canvas')
     let gl = setupGL(canvas)
     
@@ -470,6 +488,11 @@ function init() {
 
 </head>
 <body onload="init()">
+    <table>
+        <tr><td>Screen width (mm)</td><td><input id="screenWidth" readonly="readonly" /></td></tr>
+        <tr><td>Distance to screen (mm)</td><td><input id="distanceToScreen" readonly="readonly" /></td></tr>
+    </table>
+    
     <canvas id="canvas" width="1000" height="750" oncontextmenu="return false"></canvas>
 </body>
 </html>
