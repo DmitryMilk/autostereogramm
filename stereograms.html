@@ -354,15 +354,38 @@ class Scene {
         this.initParams()
         
         let builder = new BufferBuilder(mainProgram)
-        let v1 = builder.addVertex({ pos: [-50, -50, 0, 1], color: [1, 0, 0, 1] })
-        let v2 = builder.addVertex({ pos: [50, -50, 0, 1], color: [0, 1, 0, 1] })
-        let v3 = builder.addVertex({ pos: [50, 50, 0, 1], color: [0, 0, 1, 1] })
         
-        builder.addIndices('TRIANGLES', v1, v2, v3)
+        this.addCube(builder, 100)
         
         this.drawcalls = builder.uploadData()
     }
     
+    addCube(builder, size) {
+        let halfSize = size * 0.5
+        function addFace(axis1, axis2, faceShift, color) {
+            let pos = [0, 0, 0, 1]
+            pos[axis1] = -halfSize
+            pos[axis2] = -halfSize
+            pos[3 - axis1 - axis2] = faceShift
+            let v1 = builder.addVertex({ pos: pos, color: color })
+            pos[axis1] *= -1
+            let v2 = builder.addVertex({ pos: pos, color: color })
+            pos[axis2] *= -1
+            let v3 = builder.addVertex({ pos: pos, color: color })
+            pos[axis1] *= -1
+            let v4 = builder.addVertex({ pos: pos, color: color })
+            builder.addIndices('TRIANGLES', v1, v2, v3)
+            builder.addIndices('TRIANGLES', v3, v4, v1)
+        }
+
+        addFace(0, 1, halfSize, [1, 0, 0, 1])
+        addFace(1, 0, -halfSize, [0, 1, 1, 1])
+        addFace(1, 2, halfSize, [0, 1, 0, 1])
+        addFace(2, 1, -halfSize, [1, 0, 1, 1])
+        addFace(2, 0, halfSize, [0, 0, 1, 1])
+        addFace(0, 2, -halfSize, [1, 1, 0, 1])
+    }
+
     initParams() {
         this.distance = distanceToScreenMillis + depthMillis / 2
         this.alpha = 0
