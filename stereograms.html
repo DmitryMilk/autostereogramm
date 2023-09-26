@@ -349,11 +349,11 @@ function printMatrix(m) {
 class Scene {
     constructor(program) {
         let gl = program.gl
-        this.gl = gl
+        this.program = program
         
         this.initParams()
         
-        let builder = new BufferBuilder(mainProgram)
+        let builder = new BufferBuilder(program)
         
         this.addCube(builder, 100)
         
@@ -393,9 +393,9 @@ class Scene {
     }
     
     draw() {
-        let gl = this.gl
+        let gl = this.program.gl
         
-        gl.useProgram(mainProgram.program)
+        gl.useProgram(this.program.program)
         
         let pvm = buildProjectionMatrix(gl)
         translateInplace(pvm, 0, 0, -this.distance)
@@ -403,7 +403,7 @@ class Scene {
         rotateInplace(pvm, 2, 0, this.alpha)
         
         gl.uniformMatrix4fv(
-            mainProgram.uniforms.projectionViewMatrix,
+            this.program.uniforms.projectionViewMatrix,
             false,
             pvm
         )
