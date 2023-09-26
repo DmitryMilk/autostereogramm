@@ -392,29 +392,12 @@ class Scene {
         this.beta = 0
     }
     
-    buildProjectionMatrix() {
-        let gl = this.gl
-        
-        let millisPerPixel = screenWidthMillis / screen.width
-        
-        let projectionMatrix = frustum(
-            -gl.canvas.width * millisPerPixel / 2,
-            gl.canvas.width * millisPerPixel / 2,
-            -gl.canvas.height * millisPerPixel / 2,
-            gl.canvas.height * millisPerPixel / 2,
-            distanceToScreenMillis,
-            distanceToScreenMillis + depthMillis
-        )
-        
-        return projectionMatrix
-    }
-    
     draw() {
         let gl = this.gl
         
         gl.useProgram(mainProgram.program)
         
-        let pvm = this.buildProjectionMatrix()
+        let pvm = buildProjectionMatrix(gl)
         translateInplace(pvm, 0, 0, -this.distance)
         rotateInplace(pvm, 1, 2, this.beta)
         rotateInplace(pvm, 2, 0, this.alpha)
@@ -435,6 +418,22 @@ class Scene {
             )
         }
     }
+}
+
+//--------------------------------------------------------------
+function buildProjectionMatrix(gl) {
+    let millisPerPixel = screenWidthMillis / screen.width
+    
+    let projectionMatrix = frustum(
+        -gl.canvas.width * millisPerPixel / 2,
+        gl.canvas.width * millisPerPixel / 2,
+        -gl.canvas.height * millisPerPixel / 2,
+        gl.canvas.height * millisPerPixel / 2,
+        distanceToScreenMillis,
+        distanceToScreenMillis + depthMillis
+    )
+    
+    return projectionMatrix
 }
 
 //--------------------------------------------------------------
