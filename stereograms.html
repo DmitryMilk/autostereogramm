@@ -91,7 +91,6 @@ class BufferBuilder {
         
         this.indexBuffer = program.gl.createBuffer()
         this.drawcalls = {}
-        this.drawcall_suffix = ''
     }
     
     clear() {
@@ -125,14 +124,17 @@ class BufferBuilder {
         return index
     }
     
-    addIndices(type, ...indices) {
-        if ( !this.drawcalls[type + this.drawcall_suffix] ) {
-            this.drawcalls[type + this.drawcall_suffix] = {
+    addIndices(name, type, ...indices) {
+        if ( !this.drawcalls[name] ) {
+            this.drawcalls[name] = {
                 indices: [],
+                type: type,
             }
+        } else {
+            if ( this.drawcalls[name].type != type ) throw new Error('Drawcall type mismatch')
         }
         
-        this.drawcalls[type + this.drawcall_suffix].indices.push(...indices)
+        this.drawcalls[name].indices.push(...indices)
     }
     
     uploadData() {
@@ -159,6 +161,16 @@ class BufferBuilder {
             drawcall.start = pos
             drawcall.count = drawcall.indices.length
             pos += drawcall.count
+            drawcall.program = this.program
+            drawcall.draw = function() {
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer)
+                gl.drawElements(
+                    gl[this.type],
+                    this.count,
+                    gl[this.dataType],
+                    this.start * dataTypes[this.dataType].size
+                )
+            }
         }
         
         let allIndices = new dataTypes[dataType].arrayType(pos)
@@ -374,8 +386,8 @@ class Scene {
             let v3 = builder.addVertex({ pos: pos, color: color })
             pos[axis1] *= -1
             let v4 = builder.addVertex({ pos: pos, color: color })
-            builder.addIndices('TRIANGLES', v1, v2, v3)
-            builder.addIndices('TRIANGLES', v3, v4, v1)
+            builder.addIndices('objects_triangles', 'TRIANGLES', v1, v2, v3)
+            builder.addIndices('objects_triangles', 'TRIANGLES', v3, v4, v1)
         }
 
         addFace(0, 1, halfSize, [1, 0, 0, 1])
@@ -385,7 +397,7 @@ class Scene {
         addFace(2, 0, halfSize, [0, 0, 1, 1])
         addFace(0, 2, -halfSize, [1, 1, 0, 1])
     }
-
+    
     initParams() {
         this.distance = distanceToScreenMillis + depthMillis / 2
         this.alpha = 0
@@ -408,15 +420,7 @@ class Scene {
             pvm
         )
         
-        for ( const [dc_type, drawcall] of Object.entries(this.drawcalls) ) {
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, drawcall.indexBuffer)
-            gl.drawElements(
-                gl[dc_type],
-                drawcall.count,
-                gl[drawcall.dataType],
-                drawcall.start * dataTypes[drawcall.dataType].size
-            )
-        }
+        this.drawcalls.objects_triangles.draw()
     }
 }
 
