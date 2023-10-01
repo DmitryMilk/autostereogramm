@@ -89,7 +89,6 @@ class BufferBuilder {
         this.size = 0
         this.vertexArrays = program.vertexSpecification.map(x => new Array)
         
-        this.indexBuffer = program.gl.createBuffer()
         this.drawcalls = {}
     }
     
@@ -141,6 +140,7 @@ class BufferBuilder {
         let gl = this.program.gl
         
         gl.useProgram(this.program.program)
+        gl.bindVertexArray(this.program.vao)
         
         for ( let i = 0; i < this.program.vertexSpecification.length; i++ ) {
             let spec = this.program.vertexSpecification[i]
@@ -156,14 +156,12 @@ class BufferBuilder {
         let pos = 0
         let dataType = 'UNSIGNED_SHORT'
         for ( let drawcall of Object.values(this.drawcalls) ) {
-            drawcall.indexBuffer = this.indexBuffer
             drawcall.dataType = dataType
             drawcall.start = pos
             drawcall.count = drawcall.indices.length
             pos += drawcall.count
             drawcall.program = this.program
             drawcall.draw = function() {
-                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer)
                 gl.drawElements(
                     gl[this.type],
                     this.count,
@@ -178,7 +176,6 @@ class BufferBuilder {
             allIndices.set(drawcall.indices, drawcall.start)
         }
         
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer)
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, allIndices, gl.STATIC_DRAW)
         
         // this.clear()
@@ -227,6 +224,12 @@ function buildProgram(gl, program) {
         const shaderError = gl.getProgramInfoLog(program.program)
         throw new Error(`Shader error: ${shaderError}`)
     }
+    
+    program.vao = gl.createVertexArray()
+    gl.bindVertexArray(program.vao)
+    
+    if ( !program.indexBuffer ) program.indexBuffer = gl.createBuffer()
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, program.indexBuffer)
     
     for ( let spec of program.vertexSpecification ) {
         if ( !spec.buffer ) spec.buffer = gl.createBuffer()
@@ -408,6 +411,7 @@ class Scene {
         let gl = this.mainProgram.gl
         
         gl.useProgram(this.mainProgram.program)
+        gl.bindVertexArray(this.mainProgram.vao)
         
         let pvm = buildProjectionMatrix(gl)
         translateInplace(pvm, 0, 0, -this.distance)
