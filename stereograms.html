@@ -11,67 +11,8 @@ distanceToScreenMillis = 1000
 const depthMillis = 2000
 
 //--------------------------------------------------------------
-let vertexShaderSrc = `#version 300 es
-
-in vec4 pos;
-in vec4 color;
-
-uniform mat4 projectionViewMatrix;
-
-out vec4 f_color;
-
-void main() {
-    gl_Position = projectionViewMatrix * pos;
-    f_color = color;
-}
-`
-
-//--------------------------------------------------------------
-let fragmentShaderSrc = `#version 300 es
-precision highp float;
-
-out vec4 FragColor;
-in vec4 f_color;
-
-void main() {
-    FragColor = f_color;
-}
-`
-
-//--------------------------------------------------------------
-let padVertexShaderSrc = `#version 300 es
-
-in vec4 pos;
-in vec2 texCoord;
-
-uniform mat4 projectionMatrix;
-
-out vec2 uv1;
-
-void main() {
-    gl_Position = projectionMatrix * pos;
-    uv1 = texCoord;
-}
-`
-
-//--------------------------------------------------------------
-let padFragmentShaderSrc = `#version 300 es
-precision highp float;
-
-in vec2 uv1;
-
-uniform sampler2D tex;
-
-out vec4 FragColor;
-
-void main() {
-    FragColor = texture(tex, uv1);
-}
-`
-
-//--------------------------------------------------------------
 /*
-let mainProgram = {
+let program = {
     shaders: [
         { type: "VERTEX_SHADER", src: vertexShaderSrc, },
         { type: "FRAGMENT_SHADER", src: fragmentShaderSrc, }
@@ -395,13 +336,38 @@ function printMatrix(m) {
 //============================================================
 
 class Scene {
+    vertexShaderSrc = `#version 300 es
+        in vec4 pos;
+        in vec4 color;
+        
+        uniform mat4 projectionViewMatrix;
+        
+        out vec4 f_color;
+        
+        void main() {
+            gl_Position = projectionViewMatrix * pos;
+            f_color = color;
+        }
+    `
+    
+    fragmentShaderSrc = `#version 300 es
+        precision highp float;
+        
+        out vec4 FragColor;
+        in vec4 f_color;
+        
+        void main() {
+            FragColor = f_color;
+        }
+    `
+    
     constructor(gl) {
         this.initParams()
         
         this.program = {
             shaders: [
-                { type: "VERTEX_SHADER", src: vertexShaderSrc },
-                { type: "FRAGMENT_SHADER", src: fragmentShaderSrc },
+                { type: "VERTEX_SHADER", src: this.vertexShaderSrc },
+                { type: "FRAGMENT_SHADER", src: this.fragmentShaderSrc },
             ],
             uniforms: { projectionViewMatrix: null },
             vertexSpecification: [{
@@ -476,17 +442,43 @@ class Scene {
 
 //--------------------------------------------------------------
 class Pad {
+    vertexShaderSrc = `#version 300 es
+        in vec2 pos;
+        in vec2 texCoord;
+        
+        out vec2 uv1;
+        
+        void main() {
+            gl_Position = vec4(pos.x, pos.y, 0, 1.0);
+            uv1 = texCoord;
+        }
+    `
+    
+    fragmentShaderSrc = `#version 300 es
+        precision highp float;
+        
+        in vec2 uv1;
+        
+        uniform sampler2D tex;
+        
+        out vec4 FragColor;
+        
+        void main() {
+            FragColor = texture(tex, uv1);
+        }
+    `
+    
     constructor(gl, tex) {
         this.program = {
             shaders: [
-                { type: "VERTEX_SHADER", src: padVertexShaderSrc },
-                { type: "FRAGMENT_SHADER", src: padFragmentShaderSrc },
+                { type: "VERTEX_SHADER", src: this.vertexShaderSrc },
+                { type: "FRAGMENT_SHADER", src: this.fragmentShaderSrc },
             ],
-            uniforms: { projectionMatrix: null, tex: null },
+            uniforms: { tex: null },
             vertexSpecification: [{
                 type: "FLOAT",
                 attributes: [
-                    { name: "pos", sizeUnits: 4 },
+                    { name: "pos", sizeUnits: 2 },
                     { name: "texCoord", sizeUnits: 2 },
                 ],
             }],
@@ -495,11 +487,10 @@ class Pad {
         
         let builder = new BufferBuilder(this.program)
         
-        let z = - distanceToScreenMillis - depthMillis/2
-        let v1 = builder.addVertex({ pos: [ -200, -50, z, 1.0 ], texCoord: [ 0.0, 0.0 ] })
-        let v2 = builder.addVertex({ pos: [ 200, -50, z, 1.0 ], texCoord: [ 1.0, 0.0 ] })
-        let v3 = builder.addVertex({ pos: [ 200, 50, z, 1.0 ], texCoord: [ 1.0, 1.0 ] })
-        let v4 = builder.addVertex({ pos: [ -200, 50, z, 1.0 ], texCoord: [ 0.0, 1.0 ] })
+        let v1 = builder.addVertex({ pos: [ -1.0, -1.0 ], texCoord: [ 0.0, 0.0 ] })
+        let v2 = builder.addVertex({ pos: [ 1.0, -1.0 ], texCoord: [ 1.0, 0.0 ] })
+        let v3 = builder.addVertex({ pos: [ 1.0, 1.0 ], texCoord: [ 1.0, 1.0 ] })
+        let v4 = builder.addVertex({ pos: [ -1.0, 1.0 ], texCoord: [ 0.0, 1.0 ] })
         
         builder.addIndices("pad_triangles", "TRIANGLES", v1, v2, v3)
         builder.addIndices("pad_triangles", "TRIANGLES", v3, v4, v1)
@@ -518,11 +509,6 @@ class Pad {
         gl.activeTexture(gl.TEXTURE0)
         gl.bindTexture(gl.TEXTURE_2D, this.tex)
         
-        gl.uniformMatrix4fv(
-            this.program.uniforms.projectionMatrix,
-            false,
-            buildProjectionMatrix(gl)
-        )
         gl.uniform1i(this.program.uniforms.tex, 0)
         
         this.drawcalls.pad_triangles.draw()
@@ -547,7 +533,7 @@ function buildProjectionMatrix(gl) {
 
 //--------------------------------------------------------------
 function setupGL(canvas) {
-    let gl = canvas.getContext("webgl2")
+    let gl = canvas.getContext("webgl2", { antialias: false })
     gl.clearColor(0.0, 0.0, 0.0, 1.0)
     gl.enable(gl.DEPTH_TEST)
     gl.enable(gl.CULL_FACE)
@@ -570,16 +556,21 @@ function init() {
     let gl = setupGL(canvas)
     
     gl.activeTexture(gl.TEXTURE0)
+    
+    let depthTex = gl.createTexture()
+    gl.bindTexture(gl.TEXTURE_2D, depthTex)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, gl.canvas.width, gl.canvas.height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, null)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    
     let tex = gl.createTexture()
     gl.bindTexture(gl.TEXTURE_2D, tex)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.canvas.width, gl.canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-    //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-    //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
     
     let fbo = gl.createFramebuffer()
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, depthTex, 0)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     
     let scene = new Scene(gl)
@@ -587,10 +578,12 @@ function init() {
     
     function draw() {
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
+        gl.clearColor(0.0, 0.0, 0.0, 1.0)
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
         scene.draw()
         
         gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+        gl.clearColor(0.7, 0.0, 0.0, 1.0)
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
         pad.draw()
     }
