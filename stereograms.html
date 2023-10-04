@@ -39,6 +39,37 @@ void main() {
 `
 
 //--------------------------------------------------------------
+let padVertexShaderSrc = `#version 300 es
+
+in vec4 pos;
+in vec2 texCoord;
+
+uniform mat4 projectionMatrix;
+
+out vec2 uv1;
+
+void main() {
+    gl_Position = projectionMatrix * pos;
+    uv1 = texCoord;
+}
+`
+
+//--------------------------------------------------------------
+let padFragmentShaderSrc = `#version 300 es
+precision highp float;
+
+in vec2 uv1;
+
+uniform sampler2D tex;
+
+out vec4 FragColor;
+
+void main() {
+    FragColor = texture(tex, uv1);
+}
+`
+
+//--------------------------------------------------------------
 /*
 let mainProgram = {
     shaders: [
@@ -444,6 +475,61 @@ class Scene {
 }
 
 //--------------------------------------------------------------
+class Pad {
+    constructor(gl, tex) {
+        this.program = {
+            shaders: [
+                { type: "VERTEX_SHADER", src: padVertexShaderSrc },
+                { type: "FRAGMENT_SHADER", src: padFragmentShaderSrc },
+            ],
+            uniforms: { projectionMatrix: null, tex: null },
+            vertexSpecification: [{
+                type: "FLOAT",
+                attributes: [
+                    { name: "pos", sizeUnits: 4 },
+                    { name: "texCoord", sizeUnits: 2 },
+                ],
+            }],
+        }
+        buildProgram(gl, this.program)
+        
+        let builder = new BufferBuilder(this.program)
+        
+        let z = - distanceToScreenMillis - depthMillis/2
+        let v1 = builder.addVertex({ pos: [ -200, -50, z, 1.0 ], texCoord: [ 0.0, 0.0 ] })
+        let v2 = builder.addVertex({ pos: [ 200, -50, z, 1.0 ], texCoord: [ 1.0, 0.0 ] })
+        let v3 = builder.addVertex({ pos: [ 200, 50, z, 1.0 ], texCoord: [ 1.0, 1.0 ] })
+        let v4 = builder.addVertex({ pos: [ -200, 50, z, 1.0 ], texCoord: [ 0.0, 1.0 ] })
+        
+        builder.addIndices("pad_triangles", "TRIANGLES", v1, v2, v3)
+        builder.addIndices("pad_triangles", "TRIANGLES", v3, v4, v1)
+        
+        this.drawcalls = builder.uploadData()
+        
+        gl.useProgram(this.program.program)
+        this.tex = tex
+    }
+    
+    draw() {
+        let gl = this.program.gl
+        gl.useProgram(this.program.program)
+        gl.bindVertexArray(this.program.vao)
+        
+        gl.activeTexture(gl.TEXTURE0)
+        gl.bindTexture(gl.TEXTURE_2D, this.tex)
+        
+        gl.uniformMatrix4fv(
+            this.program.uniforms.projectionMatrix,
+            false,
+            buildProjectionMatrix(gl)
+        )
+        gl.uniform1i(this.program.uniforms.tex, 0)
+        
+        this.drawcalls.pad_triangles.draw()
+    }
+}
+
+//--------------------------------------------------------------
 function buildProjectionMatrix(gl) {
     let millisPerPixel = screenWidthMillis / screen.width
     
@@ -483,11 +569,30 @@ function init() {
     let canvas = document.querySelector('#canvas')
     let gl = setupGL(canvas)
     
+    gl.activeTexture(gl.TEXTURE0)
+    let tex = gl.createTexture()
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.canvas.width, gl.canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    
+    let fbo = gl.createFramebuffer()
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    
     let scene = new Scene(gl)
+    let pad = new Pad(gl, tex)
     
     function draw() {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
         scene.draw()
+        
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+        pad.draw()
     }
     
     canvas.onwheel = (evt) => {
