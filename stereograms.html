@@ -39,6 +39,7 @@ void main() {
 `
 
 //--------------------------------------------------------------
+/*
 let mainProgram = {
     shaders: [
         { type: "VERTEX_SHADER", src: vertexShaderSrc, },
@@ -79,6 +80,7 @@ let mainProgram = {
         },
     ]
 }
+*/
 
 //--------------------------------------------------------------
 class BufferBuilder {
@@ -365,10 +367,23 @@ class Scene {
     constructor(gl) {
         this.initParams()
         
-        this.mainProgram = mainProgram
-        buildProgram(gl, this.mainProgram)
+        this.program = {
+            shaders: [
+                { type: "VERTEX_SHADER", src: vertexShaderSrc },
+                { type: "FRAGMENT_SHADER", src: fragmentShaderSrc },
+            ],
+            uniforms: { projectionViewMatrix: null },
+            vertexSpecification: [{
+                type: "FLOAT",
+                attributes: [
+                    { name: "pos", sizeUnits: 4 },
+                    { name: "color", sizeUnits: 4 },
+                ]
+            }]
+        }
+        buildProgram(gl, this.program)
         
-        let builder = new BufferBuilder(this.mainProgram)
+        let builder = new BufferBuilder(this.program)
         
         this.addCube(builder, 100)
         
@@ -408,10 +423,10 @@ class Scene {
     }
     
     draw() {
-        let gl = this.mainProgram.gl
+        let gl = this.program.gl
         
-        gl.useProgram(this.mainProgram.program)
-        gl.bindVertexArray(this.mainProgram.vao)
+        gl.useProgram(this.program.program)
+        gl.bindVertexArray(this.program.vao)
         
         let pvm = buildProjectionMatrix(gl)
         translateInplace(pvm, 0, 0, -this.distance)
@@ -419,7 +434,7 @@ class Scene {
         rotateInplace(pvm, 2, 0, this.alpha)
         
         gl.uniformMatrix4fv(
-            this.mainProgram.uniforms.projectionViewMatrix,
+            this.program.uniforms.projectionViewMatrix,
             false,
             pvm
         )
