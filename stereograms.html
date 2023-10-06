@@ -460,22 +460,28 @@ class Pad {
         
         in vec2 uv1;
         
-        uniform sampler2D tex;
+        uniform sampler2D texLeft;
+        uniform sampler2D texRight;
         
         out vec4 FragColor;
         
         void main() {
-            FragColor = texture(tex, uv1);
+            FragColor = vec4(
+                texture(texLeft, uv1).r,
+                0.0,
+                texture(texRight, uv1).r,
+                1.0
+            );
         }
     `
     
-    constructor(gl, tex) {
+    constructor(gl, texLeft, texRight) {
         this.program = {
             shaders: [
                 { type: "VERTEX_SHADER", src: this.vertexShaderSrc },
                 { type: "FRAGMENT_SHADER", src: this.fragmentShaderSrc },
             ],
-            uniforms: { tex: null },
+            uniforms: { texLeft: null, texRight: null },
             vertexSpecification: [{
                 type: "FLOAT",
                 attributes: [
@@ -499,7 +505,8 @@ class Pad {
         this.drawcalls = builder.uploadData()
         
         gl.useProgram(this.program.program)
-        this.tex = tex
+        this.texLeft = texLeft
+        this.texRight = texRight
     }
     
     draw() {
@@ -508,9 +515,12 @@ class Pad {
         gl.bindVertexArray(this.program.vao)
         
         gl.activeTexture(gl.TEXTURE0)
-        gl.bindTexture(gl.TEXTURE_2D, this.tex)
+        gl.bindTexture(gl.TEXTURE_2D, this.texLeft)
+        gl.uniform1i(this.program.uniforms.texLeft, 0)
         
-        gl.uniform1i(this.program.uniforms.tex, 0)
+        gl.activeTexture(gl.TEXTURE1)
+        gl.bindTexture(gl.TEXTURE_2D, this.texRight)
+        gl.uniform1i(this.program.uniforms.texRight, 1)
         
         this.drawcalls.pad_triangles.draw()
     }
@@ -560,30 +570,40 @@ function init() {
     
     gl.activeTexture(gl.TEXTURE0)
     
-    let depthTex = gl.createTexture()
-    gl.bindTexture(gl.TEXTURE_2D, depthTex)
+    let depthTexLeft = gl.createTexture()
+    gl.bindTexture(gl.TEXTURE_2D, depthTexLeft)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, gl.canvas.width, gl.canvas.height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, null)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
     
-    let tex = gl.createTexture()
-    gl.bindTexture(gl.TEXTURE_2D, tex)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.canvas.width, gl.canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    let fboLeft = gl.createFramebuffer()
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fboLeft)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, depthTexLeft, 0)
     
-    let fbo = gl.createFramebuffer()
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0)
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, depthTex, 0)
+    let depthTexRight = gl.createTexture()
+    gl.bindTexture(gl.TEXTURE_2D, depthTexRight)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, gl.canvas.width, gl.canvas.height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, null)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+    
+    let fboRight = gl.createFramebuffer()
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fboRight)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, depthTexRight, 0)
+    
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     
     let scene = new Scene(gl)
-    let pad = new Pad(gl, tex)
+    let pad = new Pad(gl, depthTexLeft, depthTexRight)
     
     function draw() {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
         gl.clearColor(0.0, 0.0, 0.0, 1.0)
+        
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fboLeft)
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
         scene.draw(-eyesDistance / 2)
+        
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fboRight)
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
         scene.draw(eyesDistance / 2)
         
         gl.bindFramebuffer(gl.FRAMEBUFFER, null)
