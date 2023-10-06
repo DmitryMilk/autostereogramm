@@ -531,15 +531,15 @@ function buildProjectionMatrix(gl, eyeShift) {
     let millisPerPixel = screenWidthMillis / screen.width
     
     let projectionMatrix = frustum(
-        -gl.canvas.width * millisPerPixel / 2 + eyeShift,
-        gl.canvas.width * millisPerPixel / 2 + eyeShift,
+        -gl.canvas.width * millisPerPixel / 2 - eyeShift,
+        gl.canvas.width * millisPerPixel / 2 - eyeShift,
         -gl.canvas.height * millisPerPixel / 2,
         gl.canvas.height * millisPerPixel / 2,
         distanceToScreenMillis,
         distanceToScreenMillis + depthMillis
     )
     
-    translateInplace(projectionMatrix,  eyeShift, 0, 0)
+    translateInplace(projectionMatrix, -eyeShift, 0, 0)
     
     return projectionMatrix
 }
