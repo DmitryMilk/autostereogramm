@@ -7,6 +7,7 @@
 
 screenWidthMillis = 600
 distanceToScreenMillis = 1000
+eyesDistance = 62
 
 const depthMillis = 2000
 
@@ -419,13 +420,13 @@ class Scene {
         this.beta = 0
     }
     
-    draw() {
+    draw(eyeShift) {
         let gl = this.program.gl
         
         gl.useProgram(this.program.program)
         gl.bindVertexArray(this.program.vao)
         
-        let pvm = buildProjectionMatrix(gl)
+        let pvm = buildProjectionMatrix(gl, eyeShift)
         translateInplace(pvm, 0, 0, -this.distance)
         rotateInplace(pvm, 1, 2, this.beta)
         rotateInplace(pvm, 2, 0, this.alpha)
@@ -516,17 +517,19 @@ class Pad {
 }
 
 //--------------------------------------------------------------
-function buildProjectionMatrix(gl) {
+function buildProjectionMatrix(gl, eyeShift) {
     let millisPerPixel = screenWidthMillis / screen.width
     
     let projectionMatrix = frustum(
-        -gl.canvas.width * millisPerPixel / 2,
-        gl.canvas.width * millisPerPixel / 2,
+        -gl.canvas.width * millisPerPixel / 2 + eyeShift,
+        gl.canvas.width * millisPerPixel / 2 + eyeShift,
         -gl.canvas.height * millisPerPixel / 2,
         gl.canvas.height * millisPerPixel / 2,
         distanceToScreenMillis,
         distanceToScreenMillis + depthMillis
     )
+    
+    translateInplace(projectionMatrix,  eyeShift, 0, 0)
     
     return projectionMatrix
 }
@@ -580,7 +583,8 @@ function init() {
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
         gl.clearColor(0.0, 0.0, 0.0, 1.0)
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-        scene.draw()
+        scene.draw(-eyesDistance / 2)
+        scene.draw(eyesDistance / 2)
         
         gl.bindFramebuffer(gl.FRAMEBUFFER, null)
         gl.clearColor(0.7, 0.0, 0.0, 1.0)
