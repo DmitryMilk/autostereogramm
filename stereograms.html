@@ -485,7 +485,7 @@ class Pad {
         }
     `
     
-    constructor(gl, texLeft, texRight, noiseTex) {
+    constructor(gl) {
         this.program = {
             shaders: [
                 { type: "VERTEX_SHADER", src: this.vertexShaderSrc },
@@ -514,23 +514,28 @@ class Pad {
         
         this.drawcalls = builder.uploadData()
         
-        gl.useProgram(this.program.program)
-        this.texLeft = texLeft
-        this.texRight = texRight
-        this.noiseTex = noiseTex
+        let noise = new Float32Array(gl.canvas.width * gl.canvas.height)
+        for ( let i = 0; i < gl.canvas.width * gl.canvas.height; i++ ) {
+            noise[i] = Math.random()
+        }
+        this.noiseTex = gl.createTexture()
+        gl.bindTexture(gl.TEXTURE_2D, this.noiseTex)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, gl.canvas.width, gl.canvas.height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, noise)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
     }
     
-    draw() {
+    draw(depthTexLeft, depthTexRight) {
         let gl = this.program.gl
         gl.useProgram(this.program.program)
         gl.bindVertexArray(this.program.vao)
         
         gl.activeTexture(gl.TEXTURE0)
-        gl.bindTexture(gl.TEXTURE_2D, this.texLeft)
+        gl.bindTexture(gl.TEXTURE_2D, depthTexLeft)
         gl.uniform1i(this.program.uniforms.texLeft, 0)
         
         gl.activeTexture(gl.TEXTURE1)
-        gl.bindTexture(gl.TEXTURE_2D, this.texRight)
+        gl.bindTexture(gl.TEXTURE_2D, depthTexRight)
         gl.uniform1i(this.program.uniforms.texRight, 1)
         
         gl.activeTexture(gl.TEXTURE2)
@@ -613,18 +618,8 @@ function init() {
     
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     
-    let noise = new Float32Array(gl.canvas.width * gl.canvas.height)
-    for ( let i = 0; i < gl.canvas.width * gl.canvas.height; i++ ) {
-        noise[i] = Math.random()
-    }
-    let noiseTex = gl.createTexture()
-    gl.bindTexture(gl.TEXTURE_2D, noiseTex)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, gl.canvas.width, gl.canvas.height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, noise)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-    
     let scene = new Scene(gl)
-    let pad = new Pad(gl, depthTexLeft, depthTexRight, noiseTex)
+    let pad = new Pad(gl)
     
     function draw() {
         gl.clearColor(0.0, 0.0, 0.0, 1.0)
@@ -640,7 +635,7 @@ function init() {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null)
         gl.clearColor(0.7, 0.0, 0.0, 1.0)
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-        pad.draw()
+        pad.draw(depthTexLeft, depthTexRight)
     }
     
     canvas.onwheel = (evt) => {
