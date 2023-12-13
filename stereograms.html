@@ -442,9 +442,11 @@ class Scene {
 }
 
 //--------------------------------------------------------------
-// parallax = K0 / (1 + K1/normDepth), where
-// K0 = eyesDistanceMillis * screen.width / (canvas.width * screenWidthMillis)
-// K1 = distanceToScreenMillis / depthMillis
+// parallax = K * normDepth, where
+// K = depthMillis * eyesDistanceMillis * screen.width /
+//             (canvas.width * screenWidthMillis * (depthMillis + distanceToScreenMillis))
+// This is parallax of texture coord.x, not of clipbox coord.x, so it is two times smaller
+//    (clipbox width is 2.0, texture width is 1.0)
 
 class Pad {
     vertexShaderSrc = `#version 300 es
@@ -467,19 +469,24 @@ class Pad {
         uniform sampler2D texLeft;
         uniform sampler2D texRight;
         uniform sampler2D noiseTex;
-        uniform vec2 k;
+        uniform float k;
         
         out vec4 FragColor;
         
         float parallax(float normDepth) {
-            return k.x / ( 1.0 + k.y / normDepth );
+            return k * normDepth;
         }
         
         void main() {
+            float leftDepth = texture(texLeft, uv1).r;
+            float rightDepth = texture(texRight, uv1).r;
+            
+            float shifted = texture(texRight, vec2(uv1.x + parallax(leftDepth), uv1.y)).r;
+            
             FragColor = vec4(
-                texture(texLeft, uv1).r,
-                texture(noiseTex, uv1).r + parallax(texture(texRight, uv1).r) * 0.001,
-                texture(texRight, uv1).r,
+                1.0 - leftDepth,
+                1.0 - shifted + texture(noiseTex, uv1).r * 0.2,
+                1.0 - rightDepth,
                 1.0
             );
         }
@@ -542,10 +549,11 @@ class Pad {
         gl.bindTexture(gl.TEXTURE_2D, this.noiseTex)
         gl.uniform1i(this.program.uniforms.noiseTex, 2)
         
-        gl.uniform2f(
+        
+        gl.uniform1f(
             this.program.uniforms.k,
-            eyesDistanceMillis * screen.width / (gl.canvas.width * screenWidthMillis),
-            distanceToScreenMillis / depthMillis
+            depthMillis * eyesDistanceMillis * screen.width /
+                (canvas.width * screenWidthMillis * (depthMillis + distanceToScreenMillis))
         )
         
         this.drawcalls.pad_triangles.draw()
