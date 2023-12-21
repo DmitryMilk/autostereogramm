@@ -553,7 +553,7 @@ class Pad {
         gl.uniform1f(
             this.program.uniforms.k,
             depthMillis * eyesDistanceMillis * screen.width /
-                (canvas.width * screenWidthMillis * (depthMillis + distanceToScreenMillis))
+                (gl.canvas.width * screenWidthMillis * (depthMillis + distanceToScreenMillis))
         )
         
         this.drawcalls.pad_triangles.draw()
@@ -599,7 +599,7 @@ function updateViewParams() {
 function init() {
     updateViewParams()
     
-    let canvas = document.querySelector('#canvas')
+    let canvas = document.querySelector('#canvas1')
     let gl = setupGL(canvas)
     
     gl.activeTexture(gl.TEXTURE0)
@@ -692,6 +692,6 @@ function init() {
         <tr><td>Distance to screen (mm)</td><td><input id="distanceToScreen" readonly="readonly" /></td></tr>
     </table>
     
-    <canvas id="canvas" width="1000" height="750" oncontextmenu="return false"></canvas>
+    <canvas id="canvas1" width="1000" height="750" oncontextmenu="return false"></canvas>
 </body>
 </html>
