@@ -473,37 +473,25 @@ class Pad {
         
         void main() {
             // scan left to right
-            vec2 noiseCoord = gl_FragCoord.xy;
-            float par = max(
-                parallax(texelFetch(texLeft, ivec2(noiseCoord), 0).r),
-                1.0
-            );
-            float width = float(textureSize(texLeft, 0).x);
+            ivec2 noiseCoord = ivec2(gl_FragCoord);
+            int par = max(int(parallax(texelFetch(texLeft, noiseCoord, 0).r)), 1);
+            int width = textureSize(texLeft, 0).x;
             while ( noiseCoord.x + par < width ) {
                 noiseCoord.x += par;
-                par = max(
-                    parallax(texelFetch(texLeft, ivec2(noiseCoord), 0).r),
-                    1.0
-                );
+                par = max(int(parallax(texelFetch(texLeft, noiseCoord, 0).r)), 1);
             }
             
-            float noiseLeft = texelFetch(noiseTex, ivec2(noiseCoord), 0).r;
+            float noiseLeft = texelFetch(noiseTex, noiseCoord, 0).r;
             
             // scan right to left
-            noiseCoord.x = gl_FragCoord.x;
-            par = max(
-                parallax(texelFetch(texRight, ivec2(noiseCoord), 0).r),
-                1.0
-            );
+            noiseCoord.x = int(gl_FragCoord.x);
+            par = max(int(parallax(texelFetch(texRight, noiseCoord, 0).r)), 1);
             while ( noiseCoord.x >= par ) {
                 noiseCoord.x -= par;
-                par = max(
-                    parallax(texelFetch(texRight, ivec2(noiseCoord), 0).r),
-                    1.0
-                );
+                par = max(int(parallax(texelFetch(texRight, noiseCoord, 0).r)), 1);
             }
             
-            float noiseRight = texelFetch(noiseTex, ivec2(noiseCoord), 0).r;
+            float noiseRight = texelFetch(noiseTex, noiseCoord, 0).r;
             
             float noise = (noiseLeft + noiseRight) > 1.0 ? 1.0 : 0.0;
             
