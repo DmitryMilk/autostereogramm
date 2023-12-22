@@ -472,17 +472,42 @@ class Pad {
         }
         
         void main() {
-            float leftDepth = texelFetch(texLeft, ivec2(gl_FragCoord), 0).r;
-            float rightDepth = texelFetch(texRight, ivec2(gl_FragCoord), 0).r;
-            
-            float shifted = texelFetch(texRight, ivec2(gl_FragCoord.x + parallax(leftDepth), gl_FragCoord.y), 0).r;
-            
-            FragColor = vec4(
-                1.0 - leftDepth,
-                (1.0 - shifted) * texelFetch(noiseTex, ivec2(gl_FragCoord), 0).r,
-                1.0 - rightDepth,
+            // scan left to right
+            vec2 noiseCoord = gl_FragCoord.xy;
+            float par = max(
+                parallax(texelFetch(texLeft, ivec2(noiseCoord), 0).r),
                 1.0
             );
+            float width = float(textureSize(texLeft, 0).x);
+            while ( noiseCoord.x + par < width ) {
+                noiseCoord.x += par;
+                par = max(
+                    parallax(texelFetch(texLeft, ivec2(noiseCoord), 0).r),
+                    1.0
+                );
+            }
+            
+            float noiseLeft = texelFetch(noiseTex, ivec2(noiseCoord), 0).r;
+            
+            // scan right to left
+            noiseCoord.x = gl_FragCoord.x;
+            par = max(
+                parallax(texelFetch(texRight, ivec2(noiseCoord), 0).r),
+                1.0
+            );
+            while ( noiseCoord.x >= par ) {
+                noiseCoord.x -= par;
+                par = max(
+                    parallax(texelFetch(texRight, ivec2(noiseCoord), 0).r),
+                    1.0
+                );
+            }
+            
+            float noiseRight = texelFetch(noiseTex, ivec2(noiseCoord), 0).r;
+            
+            float noise = (noiseLeft + noiseRight) > 1.0 ? 1.0 : 0.0;
+            
+            FragColor = vec4(noise, noise, noise, 1.0);
         }
     `
     
@@ -516,7 +541,8 @@ class Pad {
         
         let noise = new Float32Array(gl.canvas.width * gl.canvas.height)
         for ( let i = 0; i < gl.canvas.width * gl.canvas.height; i++ ) {
-            noise[i] = Math.random()
+            let value = Math.random()
+            noise[i] = value
         }
         this.noiseTex = gl.createTexture()
         gl.bindTexture(gl.TEXTURE_2D, this.noiseTex)
