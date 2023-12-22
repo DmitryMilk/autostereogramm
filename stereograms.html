@@ -442,29 +442,23 @@ class Scene {
 }
 
 //--------------------------------------------------------------
+// parallax in pixels:
 // parallax = K * normDepth, where
-// K = depthMillis * eyesDistanceMillis * screen.width /
-//             (canvas.width * screenWidthMillis * (depthMillis + distanceToScreenMillis))
-// This is parallax of texture coord.x, not of clipbox coord.x, so it is two times smaller
-//    (clipbox width is 2.0, texture width is 1.0)
+// normDepth - depth from depth texture (in range 0.0 - 1.0)
+// K = boxDepthMillis * eyesDistanceMillis * screen.width /
+//             (screenWidthMillis * (boxDepthMillis + distanceToScreenMillis))
 
 class Pad {
     vertexShaderSrc = `#version 300 es
         in vec2 pos;
-        in vec2 texCoord;
-        
-        out vec2 uv1;
         
         void main() {
             gl_Position = vec4(pos.x, pos.y, 0, 1.0);
-            uv1 = texCoord;
         }
     `
     
     fragmentShaderSrc = `#version 300 es
         precision highp float;
-        
-        in vec2 uv1;
         
         uniform sampler2D texLeft;
         uniform sampler2D texRight;
@@ -478,14 +472,14 @@ class Pad {
         }
         
         void main() {
-            float leftDepth = texture(texLeft, uv1).r;
-            float rightDepth = texture(texRight, uv1).r;
+            float leftDepth = texelFetch(texLeft, ivec2(gl_FragCoord), 0).r;
+            float rightDepth = texelFetch(texRight, ivec2(gl_FragCoord), 0).r;
             
-            float shifted = texture(texRight, vec2(uv1.x + parallax(leftDepth), uv1.y)).r;
+            float shifted = texelFetch(texRight, ivec2(gl_FragCoord.x + parallax(leftDepth), gl_FragCoord.y), 0).r;
             
             FragColor = vec4(
                 1.0 - leftDepth,
-                1.0 - shifted + texture(noiseTex, uv1).r * 0.2,
+                (1.0 - shifted) * texelFetch(noiseTex, ivec2(gl_FragCoord), 0).r,
                 1.0 - rightDepth,
                 1.0
             );
@@ -503,7 +497,6 @@ class Pad {
                 type: "FLOAT",
                 attributes: [
                     { name: "pos", sizeUnits: 2 },
-                    { name: "texCoord", sizeUnits: 2 },
                 ],
             }],
         }
@@ -511,10 +504,10 @@ class Pad {
         
         let builder = new BufferBuilder(this.program)
         
-        let v1 = builder.addVertex({ pos: [ -1.0, -1.0 ], texCoord: [ 0.0, 0.0 ] })
-        let v2 = builder.addVertex({ pos: [ 1.0, -1.0 ], texCoord: [ 1.0, 0.0 ] })
-        let v3 = builder.addVertex({ pos: [ 1.0, 1.0 ], texCoord: [ 1.0, 1.0 ] })
-        let v4 = builder.addVertex({ pos: [ -1.0, 1.0 ], texCoord: [ 0.0, 1.0 ] })
+        let v1 = builder.addVertex({ pos: [ -1.0, -1.0 ] })
+        let v2 = builder.addVertex({ pos: [ 1.0, -1.0 ] })
+        let v3 = builder.addVertex({ pos: [ 1.0, 1.0 ] })
+        let v4 = builder.addVertex({ pos: [ -1.0, 1.0 ] })
         
         builder.addIndices("pad_triangles", "TRIANGLES", v1, v2, v3)
         builder.addIndices("pad_triangles", "TRIANGLES", v3, v4, v1)
@@ -553,7 +546,7 @@ class Pad {
         gl.uniform1f(
             this.program.uniforms.k,
             depthMillis * eyesDistanceMillis * screen.width /
-                (gl.canvas.width * screenWidthMillis * (depthMillis + distanceToScreenMillis))
+                (screenWidthMillis * (depthMillis + distanceToScreenMillis))
         )
         
         this.drawcalls.pad_triangles.draw()
