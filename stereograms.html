@@ -610,8 +610,10 @@ function setupGL(canvas) {
 function updateViewParams() {
     let screenWidthElement = document.querySelector('#screenWidth')
     let distanceToScreenElement = document.querySelector('#distanceToScreen')
+    let eyesDistanceElement = document.querySelector('#eyesDistance')
     screenWidthElement.value = screenWidthMillis
     distanceToScreenElement.value = distanceToScreenMillis
+    eyesDistanceElement.value = eyesDistanceMillis
 }
 
 //--------------------------------------------------------------
@@ -707,6 +709,7 @@ function init() {
 </head>
 <body onload="init()">
     <table>
+        <tr><td>Eyes distance (mm)</td><td><input id="eyesDistance" readonly="readonly" /></td></tr>
         <tr><td>Screen width (mm)</td><td><input id="screenWidth" readonly="readonly" /></td></tr>
         <tr><td>Distance to screen (mm)</td><td><input id="distanceToScreen" readonly="readonly" /></td></tr>
     </table>
