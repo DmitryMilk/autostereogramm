@@ -655,7 +655,7 @@ function init() {
     
     canvas.onwheel = (evt) => {
         const distCoef = 1.01
-        if ( evt.wheelDelta > 0 ) scene.distance /= distCoef
+        if ( evt.wheelDelta > 0 && scene.distance > distanceToScreenMillis + depthMillis / 2 ) scene.distance /= distCoef
         else if ( evt.wheelDelta < 0 ) scene.distance *= distCoef
         requestAnimationFrame(draw)
     }
