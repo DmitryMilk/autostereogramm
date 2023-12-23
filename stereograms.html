@@ -549,6 +549,11 @@ class Pad {
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, gl.canvas.width, gl.canvas.height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, noise)
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+        
+        this.initParams()
+    }
+    
+    initParams() {
     }
     
     draw(depthTexLeft, depthTexRight) {
@@ -607,13 +612,24 @@ function setupGL(canvas) {
 }
 
 //--------------------------------------------------------------
+function checkNumericParam(paramId, oldValue, minValue, maxValue) {
+    let element = document.querySelector(paramId)
+    let newValue = parseFloat(element.value)
+    element.style.background = ''
+    if ( isNaN(newValue) || newValue < minValue || newValue > maxValue ) {
+        element.value = oldValue
+        return oldValue
+    } else {
+        element.value = newValue
+        return newValue
+    }
+}
+
+//--------------------------------------------------------------
 function updateViewParams() {
-    let screenWidthElement = document.querySelector('#screenWidth')
-    let distanceToScreenElement = document.querySelector('#distanceToScreen')
-    let eyesDistanceElement = document.querySelector('#eyesDistance')
-    screenWidthElement.value = screenWidthMillis
-    distanceToScreenElement.value = distanceToScreenMillis
-    eyesDistanceElement.value = eyesDistanceMillis
+    screenWidthMillis = checkNumericParam('#screenWidth', screenWidthMillis, 10, NaN)
+    distanceToScreenMillis = checkNumericParam('#distanceToScreen', distanceToScreenMillis, 10, NaN)
+    eyesDistanceMillis = checkNumericParam('#eyesDistance', eyesDistanceMillis, 30, 100)
 }
 
 //--------------------------------------------------------------
@@ -700,6 +716,20 @@ function init() {
         canvas.releasePointerCapture(evt.pointerId)
     }
     
+    for ( const paramId of ['#screenWidth', '#distanceToScreen', '#eyesDistance'] ) {
+        let element = document.querySelector(paramId)
+        element.oninput = (evt) => {
+            element.style.background = '#FF8080'
+        }
+        
+        element.onchange = (evt) => {
+            updateViewParams()
+            scene.initParams()
+            pad.initParams()
+            requestAnimationFrame(draw)
+        }
+    }
+    
     requestAnimationFrame(draw)
 }
 
@@ -709,9 +739,9 @@ function init() {
 </head>
 <body onload="init()">
     <table>
-        <tr><td>Eyes distance (mm)</td><td><input id="eyesDistance" readonly="readonly" /></td></tr>
-        <tr><td>Screen width (mm)</td><td><input id="screenWidth" readonly="readonly" /></td></tr>
-        <tr><td>Distance to screen (mm)</td><td><input id="distanceToScreen" readonly="readonly" /></td></tr>
+        <tr><td>Eyes distance (mm)</td><td><input id="eyesDistance" /></td></tr>
+        <tr><td>Screen width (mm)</td><td><input id="screenWidth" /></td></tr>
+        <tr><td>Distance to screen (mm)</td><td><input id="distanceToScreen" /></td></tr>
     </table>
     
     <canvas id="canvas1" width="1000" height="750" oncontextmenu="return false"></canvas>
