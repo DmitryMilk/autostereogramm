@@ -483,8 +483,8 @@ class Pad {
                 par = max(int(parallax(texelFetch(texLeft, noiseCoord, 0).r)), 1);
             }
             
-            noiseCoord.x += int(randomShift);
-            if ( noiseCoord.x >= width ) noiseCoord.x -= width;
+            noiseCoord.x -= int(randomShift);
+            if ( noiseCoord.x < 0 ) noiseCoord.x += width;
             float noiseLeft = texelFetch(noiseTex, noiseCoord, 0).r;
             
             // scan right to left
@@ -495,8 +495,8 @@ class Pad {
                 par = max(int(parallax(texelFetch(texRight, noiseCoord, 0).r)), 1);
             }
             
-            noiseCoord.x -= int(randomShift);
-            if ( noiseCoord.x < 0 ) noiseCoord.x += width;
+            noiseCoord.x += int(randomShift);
+            if ( noiseCoord.x >= width ) noiseCoord.x -= width;
             float noiseRight = texelFetch(noiseTex, noiseCoord, 0).r;
             
             float noise = (noiseLeft + noiseRight) * 0.75;
@@ -534,10 +534,9 @@ class Pad {
         this.drawcalls = builder.uploadData()
         
         let noise = new Float32Array(gl.canvas.width * gl.canvas.height)
-        for ( let i = 0; i < gl.canvas.width * gl.canvas.height; i+=2 ) {
+        for ( let i = 0; i < gl.canvas.width * gl.canvas.height; i++ ) {
             let value = Math.random()
             noise[i] = value
-            noise[i+1] = value
         }
         this.noiseTex = gl.createTexture()
         gl.bindTexture(gl.TEXTURE_2D, this.noiseTex)
@@ -571,7 +570,7 @@ class Pad {
         )
         
         if ( document.querySelector('#updateEntireCanvas').checked ) {
-            gl.uniform1f(this.program.uniforms.randomShift, Math.random()*gl.canvas.width)
+            gl.uniform1f(this.program.uniforms.randomShift, Math.random()*gl.canvas.width/4)
         }
         
         this.drawcalls.pad_triangles.draw()
