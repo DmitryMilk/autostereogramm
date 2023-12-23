@@ -464,6 +464,7 @@ class Pad {
         uniform sampler2D texRight;
         uniform sampler2D noiseTex;
         uniform float k;
+        uniform float randomShift;
         
         out vec4 FragColor;
         
@@ -472,15 +473,18 @@ class Pad {
         }
         
         void main() {
+            int width = textureSize(texLeft, 0).x;
+            
             // scan left to right
             ivec2 noiseCoord = ivec2(gl_FragCoord);
             int par = max(int(parallax(texelFetch(texLeft, noiseCoord, 0).r)), 1);
-            int width = textureSize(texLeft, 0).x;
             while ( noiseCoord.x + par < width ) {
                 noiseCoord.x += par;
                 par = max(int(parallax(texelFetch(texLeft, noiseCoord, 0).r)), 1);
             }
             
+            noiseCoord.x += int(randomShift);
+            if ( noiseCoord.x >= width ) noiseCoord.x -= width;
             float noiseLeft = texelFetch(noiseTex, noiseCoord, 0).r;
             
             // scan right to left
@@ -491,9 +495,11 @@ class Pad {
                 par = max(int(parallax(texelFetch(texRight, noiseCoord, 0).r)), 1);
             }
             
+            noiseCoord.x -= int(randomShift);
+            if ( noiseCoord.x < 0 ) noiseCoord.x += width;
             float noiseRight = texelFetch(noiseTex, noiseCoord, 0).r;
             
-            float noise = (noiseLeft + noiseRight) > 1.0 ? 1.0 : 0.0;
+            float noise = (noiseLeft + noiseRight) * 0.75;
             
             FragColor = vec4(noise, noise, noise, 1.0);
         }
@@ -505,7 +511,7 @@ class Pad {
                 { type: "VERTEX_SHADER", src: this.vertexShaderSrc },
                 { type: "FRAGMENT_SHADER", src: this.fragmentShaderSrc },
             ],
-            uniforms: { texLeft: null, texRight: null, noiseTex: null, k: null },
+            uniforms: { texLeft: null, texRight: null, noiseTex: null, k: null, randomShift: null },
             vertexSpecification: [{
                 type: "FLOAT",
                 attributes: [
@@ -528,9 +534,10 @@ class Pad {
         this.drawcalls = builder.uploadData()
         
         let noise = new Float32Array(gl.canvas.width * gl.canvas.height)
-        for ( let i = 0; i < gl.canvas.width * gl.canvas.height; i++ ) {
+        for ( let i = 0; i < gl.canvas.width * gl.canvas.height; i+=2 ) {
             let value = Math.random()
             noise[i] = value
+            noise[i+1] = value
         }
         this.noiseTex = gl.createTexture()
         gl.bindTexture(gl.TEXTURE_2D, this.noiseTex)
@@ -562,6 +569,10 @@ class Pad {
             depthMillis * eyesDistanceMillis * screen.width /
                 (screenWidthMillis * (depthMillis + distanceToScreenMillis))
         )
+        
+        if ( document.querySelector('#updateEntireCanvas').checked ) {
+            gl.uniform1f(this.program.uniforms.randomShift, Math.random()*gl.canvas.width)
+        }
         
         this.drawcalls.pad_triangles.draw()
     }
@@ -655,7 +666,7 @@ function init() {
     
     canvas.onwheel = (evt) => {
         const distCoef = 1.01
-        if ( evt.wheelDelta > 0 ) scene.distance /= distCoef
+        if ( evt.wheelDelta > 0 && scene.distance > distanceToScreenMillis + depthMillis / 2 ) scene.distance /= distCoef
         else if ( evt.wheelDelta < 0 ) scene.distance *= distCoef
         requestAnimationFrame(draw)
     }
@@ -697,6 +708,7 @@ function init() {
     <table>
         <tr><td>Screen width (mm)</td><td><input id="screenWidth" readonly="readonly" /></td></tr>
         <tr><td>Distance to screen (mm)</td><td><input id="distanceToScreen" readonly="readonly" /></td></tr>
+        <tr><td>Update entire canvas</td><td><input type="checkbox" id="updateEntireCanvas" /></td></tr>
     </table>
     
     <canvas id="canvas1" width="1000" height="750" oncontextmenu="return false"></canvas>
