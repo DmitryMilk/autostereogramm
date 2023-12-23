@@ -489,8 +489,8 @@ class Pad {
                 );
             }
             
-            noiseCoord.x += randomShift;
-            if ( noiseCoord.x >= canvasSize.x ) noiseCoord.x -= canvasSize.x;
+            noiseCoord.x -= randomShift;
+            if ( noiseCoord.x < 0.0 ) noiseCoord.x += canvasSize.x;
             float noiseLeft = texture(noiseTex, noiseCoord / canvasSize).r;
             
             // scan right to left
@@ -507,11 +507,11 @@ class Pad {
                 );
             }
             
-            noiseCoord.x -= randomShift;
-            if ( noiseCoord.x < 0.0 ) noiseCoord.x += canvasSize.x;
+            noiseCoord.x += randomShift;
+            if ( noiseCoord.x >= canvasSize.x ) noiseCoord.x -= canvasSize.x;
             float noiseRight = texture(noiseTex, noiseCoord / canvasSize).r;
             
-            float noise = (noiseLeft + noiseRight) * 0.5;
+            float noise = (noiseLeft + noiseRight) * 0.7;
             
             FragColor = vec4(noise, noise, noise, 1.0);
         }
@@ -546,10 +546,9 @@ class Pad {
         this.drawcalls = builder.uploadData()
         
         let noise = new Float32Array(gl.canvas.width * gl.canvas.height)
-        for ( let i = 0; i < gl.canvas.width * gl.canvas.height; i+=2 ) {
+        for ( let i = 0; i < gl.canvas.width * gl.canvas.height; i++ ) {
             let value = Math.random()
             noise[i] = value
-            noise[i+1] = value
         }
         this.noiseTex = gl.createTexture()
         gl.bindTexture(gl.TEXTURE_2D, this.noiseTex)
@@ -583,7 +582,7 @@ class Pad {
         )
         
         if ( document.querySelector('#updateEntireCanvas').checked ) {
-            gl.uniform1f(this.program.uniforms.randomShift, Math.random()*gl.canvas.width)
+            gl.uniform1f(this.program.uniforms.randomShift, Math.random()*gl.canvas.width/4)
         }
         
         this.drawcalls.pad_triangles.draw()
