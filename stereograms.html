@@ -464,6 +464,7 @@ class Pad {
         uniform sampler2D texRight;
         uniform sampler2D noiseTex;
         uniform float k;
+        uniform float randomShift;
         
         out vec4 FragColor;
         
@@ -472,14 +473,15 @@ class Pad {
         }
         
         void main() {
+            vec2 canvasSize = vec2(textureSize(texLeft, 0).xy);
+            
             // scan left to right
             vec2 noiseCoord = gl_FragCoord.xy;
             float par = max(
                 parallax(texelFetch(texLeft, ivec2(noiseCoord), 0).r),
                 1.0
             );
-            float width = float(textureSize(texLeft, 0).x);
-            while ( noiseCoord.x + par < width ) {
+            while ( noiseCoord.x + par < canvasSize.x ) {
                 noiseCoord.x += par;
                 par = max(
                     parallax(texelFetch(texLeft, ivec2(noiseCoord), 0).r),
@@ -487,7 +489,9 @@ class Pad {
                 );
             }
             
-            float noiseLeft = texelFetch(noiseTex, ivec2(noiseCoord), 0).r;
+            noiseCoord.x += randomShift;
+            if ( noiseCoord.x >= canvasSize.x ) noiseCoord.x -= canvasSize.x;
+            float noiseLeft = texture(noiseTex, noiseCoord / canvasSize).r;
             
             // scan right to left
             noiseCoord.x = gl_FragCoord.x;
@@ -503,9 +507,11 @@ class Pad {
                 );
             }
             
-            float noiseRight = texelFetch(noiseTex, ivec2(noiseCoord), 0).r;
+            noiseCoord.x -= randomShift;
+            if ( noiseCoord.x < 0.0 ) noiseCoord.x += canvasSize.x;
+            float noiseRight = texture(noiseTex, noiseCoord / canvasSize).r;
             
-            float noise = (noiseLeft + noiseRight) > 1.0 ? 1.0 : 0.0;
+            float noise = (noiseLeft + noiseRight) * 0.5;
             
             FragColor = vec4(noise, noise, noise, 1.0);
         }
@@ -517,7 +523,7 @@ class Pad {
                 { type: "VERTEX_SHADER", src: this.vertexShaderSrc },
                 { type: "FRAGMENT_SHADER", src: this.fragmentShaderSrc },
             ],
-            uniforms: { texLeft: null, texRight: null, noiseTex: null, k: null },
+            uniforms: { texLeft: null, texRight: null, noiseTex: null, k: null, randomShift: null },
             vertexSpecification: [{
                 type: "FLOAT",
                 attributes: [
@@ -540,9 +546,10 @@ class Pad {
         this.drawcalls = builder.uploadData()
         
         let noise = new Float32Array(gl.canvas.width * gl.canvas.height)
-        for ( let i = 0; i < gl.canvas.width * gl.canvas.height; i++ ) {
+        for ( let i = 0; i < gl.canvas.width * gl.canvas.height; i+=2 ) {
             let value = Math.random()
             noise[i] = value
+            noise[i+1] = value
         }
         this.noiseTex = gl.createTexture()
         gl.bindTexture(gl.TEXTURE_2D, this.noiseTex)
@@ -574,6 +581,10 @@ class Pad {
             depthMillis * eyesDistanceMillis * screen.width /
                 (screenWidthMillis * (depthMillis + distanceToScreenMillis))
         )
+        
+        if ( document.querySelector('#updateEntireCanvas').checked ) {
+            gl.uniform1f(this.program.uniforms.randomShift, Math.random()*gl.canvas.width)
+        }
         
         this.drawcalls.pad_triangles.draw()
     }
@@ -667,7 +678,7 @@ function init() {
     
     canvas.onwheel = (evt) => {
         const distCoef = 1.01
-        if ( evt.wheelDelta > 0 ) scene.distance /= distCoef
+        if ( evt.wheelDelta > 0 && scene.distance > distanceToScreenMillis + depthMillis / 2 ) scene.distance /= distCoef
         else if ( evt.wheelDelta < 0 ) scene.distance *= distCoef
         requestAnimationFrame(draw)
     }
@@ -709,6 +720,7 @@ function init() {
     <table>
         <tr><td>Screen width (mm)</td><td><input id="screenWidth" readonly="readonly" /></td></tr>
         <tr><td>Distance to screen (mm)</td><td><input id="distanceToScreen" readonly="readonly" /></td></tr>
+        <tr><td>Update entire canvas</td><td><input type="checkbox" id="updateEntireCanvas" /></td></tr>
     </table>
     
     <canvas id="canvas1" width="1000" height="750" oncontextmenu="return false"></canvas>
