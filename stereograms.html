@@ -709,6 +709,12 @@ function init() {
     })
     resizeObserver.observe(canvas)
     
+    document.querySelector('#fsbutton').onclick = (evt) => {
+        if (!document.fullscreenElement) {
+            canvas.requestFullscreen()
+        }
+    }
+    
     canvas.onwheel = (evt) => {
         const distCoef = 1.01
         if ( evt.wheelDelta > 0 ) scene.distance /= distCoef
@@ -770,8 +776,16 @@ body {
   flex-direction: column;
 }
 
+#header {
+    background: #f0f0f0;
+}
+
 canvas {
-    height: 100%
+    height: 100%;
+}
+
+#fsbutton {
+    height: 100%;
 }
 
 </style>
@@ -780,7 +794,11 @@ canvas {
 <body onload="init()">
     <div id="header">
         <table>
-            <tr><td>Eyes distance (mm)</td><td><input id="eyesDistance" /></td></tr>
+            <tr>
+                <td>Eyes distance (mm)</td>
+                <td><input id="eyesDistance" /></td>
+                <td rowspan="3" id="fscell"><button id="fsbutton">Fullscreen</button></td>
+            </tr>
             <tr><td>Screen width (mm)</td><td><input id="screenWidth" /></td></tr>
             <tr><td>Distance to screen (mm)</td><td><input id="distanceToScreen" /></td></tr>
         </table>
