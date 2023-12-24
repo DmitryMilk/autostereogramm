@@ -539,14 +539,9 @@ class Pad {
         
         this.drawcalls = builder.uploadData()
         
-        let noise = new Float32Array(gl.canvas.width * gl.canvas.height)
-        for ( let i = 0; i < gl.canvas.width * gl.canvas.height; i++ ) {
-            let value = Math.random()
-            noise[i] = value
-        }
         this.noiseTex = gl.createTexture()
         gl.bindTexture(gl.TEXTURE_2D, this.noiseTex)
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, gl.canvas.width, gl.canvas.height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, noise)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, gl.canvas.width, gl.canvas.height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, null)
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
         
@@ -554,6 +549,14 @@ class Pad {
     }
     
     initParams() {
+        let gl = this.program.gl
+        let noise = new Float32Array(gl.canvas.width * gl.canvas.height)
+        for ( let i = 0; i < gl.canvas.width * gl.canvas.height; i++ ) {
+            let value = Math.random()
+            noise[i] = value
+        }
+        gl.bindTexture(gl.TEXTURE_2D, this.noiseTex)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, gl.canvas.width, gl.canvas.height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, noise)
     }
     
     draw(depthTexLeft, depthTexRight) {
@@ -683,6 +686,29 @@ function init() {
         pad.draw(depthTexLeft, depthTexRight)
     }
     
+    let resizeObserver = new ResizeObserver((entries) => {
+        for ( const entry of entries ) {
+            if ( entry.target===canvas ) {
+                canvas.width = entry.contentRect.width
+                canvas.height = entry.contentRect.height
+                console.log(`New canvas size: ${canvas.width} / ${canvas.height}`)
+                
+                gl.viewport(0, 0, canvas.width, canvas.height)
+                
+                gl.bindTexture(gl.TEXTURE_2D, depthTexLeft)
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, gl.canvas.width, gl.canvas.height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, null)
+                
+                gl.bindTexture(gl.TEXTURE_2D, depthTexRight)
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, gl.canvas.width, gl.canvas.height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, null)
+                
+                scene.initParams()
+                pad.initParams()
+            }
+        }
+        requestAnimationFrame(draw)
+    })
+    resizeObserver.observe(canvas)
+    
     canvas.onwheel = (evt) => {
         const distCoef = 1.01
         if ( evt.wheelDelta > 0 ) scene.distance /= distCoef
@@ -736,14 +762,30 @@ function init() {
 //--------------------------------------------------------------
 </script>
 
+<style>
+html,
+body {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+canvas {
+    height: 100%
+}
+
+</style>
+
 </head>
 <body onload="init()">
-    <table>
-        <tr><td>Eyes distance (mm)</td><td><input id="eyesDistance" /></td></tr>
-        <tr><td>Screen width (mm)</td><td><input id="screenWidth" /></td></tr>
-        <tr><td>Distance to screen (mm)</td><td><input id="distanceToScreen" /></td></tr>
-    </table>
+    <div id="header">
+        <table>
+            <tr><td>Eyes distance (mm)</td><td><input id="eyesDistance" /></td></tr>
+            <tr><td>Screen width (mm)</td><td><input id="screenWidth" /></td></tr>
+            <tr><td>Distance to screen (mm)</td><td><input id="distanceToScreen" /></td></tr>
+        </table>
+    </div>
     
-    <canvas id="canvas1" width="1000" height="750" oncontextmenu="return false"></canvas>
+    <canvas id="canvas1" oncontextmenu="return false"></canvas>
 </body>
 </html>
