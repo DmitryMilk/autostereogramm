@@ -545,16 +545,24 @@ class Pad {
         
         this.drawcalls = builder.uploadData()
         
+        this.noiseTex = gl.createTexture()
+        gl.bindTexture(gl.TEXTURE_2D, this.noiseTex)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, gl.canvas.width, gl.canvas.height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, null)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+        
+        this.initParams()
+    }
+    
+    initParams() {
+        let gl = this.program.gl
         let noise = new Float32Array(gl.canvas.width * gl.canvas.height)
         for ( let i = 0; i < gl.canvas.width * gl.canvas.height; i++ ) {
             let value = Math.random()
             noise[i] = value
         }
-        this.noiseTex = gl.createTexture()
         gl.bindTexture(gl.TEXTURE_2D, this.noiseTex)
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, gl.canvas.width, gl.canvas.height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, noise)
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
     }
     
     draw(depthTexLeft, depthTexRight) {
@@ -617,11 +625,24 @@ function setupGL(canvas) {
 }
 
 //--------------------------------------------------------------
+function checkNumericParam(paramId, oldValue, minValue, maxValue) {
+    let element = document.querySelector(paramId)
+    let newValue = parseFloat(element.value)
+    element.style.background = ''
+    if ( isNaN(newValue) || newValue < minValue || newValue > maxValue ) {
+        element.value = oldValue
+        return oldValue
+    } else {
+        element.value = newValue
+        return newValue
+    }
+}
+
+//--------------------------------------------------------------
 function updateViewParams() {
-    let screenWidthElement = document.querySelector('#screenWidth')
-    let distanceToScreenElement = document.querySelector('#distanceToScreen')
-    screenWidthElement.value = screenWidthMillis
-    distanceToScreenElement.value = distanceToScreenMillis
+    screenWidthMillis = checkNumericParam('#screenWidth', screenWidthMillis, 10, NaN)
+    distanceToScreenMillis = checkNumericParam('#distanceToScreen', distanceToScreenMillis, 10, NaN)
+    eyesDistanceMillis = checkNumericParam('#eyesDistance', eyesDistanceMillis, 30, 100)
 }
 
 //--------------------------------------------------------------
@@ -675,6 +696,35 @@ function init() {
         pad.draw(depthTexLeft, depthTexRight)
     }
     
+    let resizeObserver = new ResizeObserver((entries) => {
+        for ( const entry of entries ) {
+            if ( entry.target===canvas ) {
+                canvas.width = entry.contentRect.width
+                canvas.height = entry.contentRect.height
+                console.log(`New canvas size: ${canvas.width} / ${canvas.height}`)
+                
+                gl.viewport(0, 0, canvas.width, canvas.height)
+                
+                gl.bindTexture(gl.TEXTURE_2D, depthTexLeft)
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, gl.canvas.width, gl.canvas.height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, null)
+                
+                gl.bindTexture(gl.TEXTURE_2D, depthTexRight)
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, gl.canvas.width, gl.canvas.height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, null)
+                
+                scene.initParams()
+                pad.initParams()
+            }
+        }
+        requestAnimationFrame(draw)
+    })
+    resizeObserver.observe(canvas)
+    
+    document.querySelector('#fsbutton').onclick = (evt) => {
+        if (!document.fullscreenElement) {
+            canvas.requestFullscreen()
+        }
+    }
+    
     canvas.onwheel = (evt) => {
         const distCoef = 1.01
         if ( evt.wheelDelta > 0 && scene.distance > distanceToScreenMillis + depthMillis / 2 ) scene.distance /= distCoef
@@ -708,20 +758,63 @@ function init() {
         canvas.releasePointerCapture(evt.pointerId)
     }
     
+    for ( const paramId of ['#screenWidth', '#distanceToScreen', '#eyesDistance'] ) {
+        let element = document.querySelector(paramId)
+        element.oninput = (evt) => {
+            element.style.background = '#FF8080'
+        }
+        
+        element.onchange = (evt) => {
+            updateViewParams()
+            scene.initParams()
+            pad.initParams()
+            requestAnimationFrame(draw)
+        }
+    }
+    
     requestAnimationFrame(draw)
 }
 
 //--------------------------------------------------------------
 </script>
 
+<style>
+html,
+body {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+#header {
+    background: #f0f0f0;
+}
+
+canvas {
+    height: 100%;
+}
+
+#fsbutton {
+    height: 100%;
+}
+
+</style>
+
 </head>
 <body onload="init()">
-    <table>
-        <tr><td>Screen width (mm)</td><td><input id="screenWidth" readonly="readonly" /></td></tr>
-        <tr><td>Distance to screen (mm)</td><td><input id="distanceToScreen" readonly="readonly" /></td></tr>
-        <tr><td>Update entire canvas</td><td><input type="checkbox" id="updateEntireCanvas" /></td></tr>
-    </table>
+    <div id="header">
+        <table>
+            <tr>
+                <td>Eyes distance (mm)</td>
+                <td><input id="eyesDistance" /></td>
+                <td rowspan="4" id="fscell"><button id="fsbutton">Fullscreen</button></td>
+            </tr>
+            <tr><td>Screen width (mm)</td><td><input id="screenWidth" /></td></tr>
+            <tr><td>Distance to screen (mm)</td><td><input id="distanceToScreen" /></td></tr>
+            <tr><td>Update entire canvas</td><td><input type="checkbox" id="updateEntireCanvas" /></td></tr>
+        </table>
+    </div>
     
-    <canvas id="canvas1" width="1000" height="750" oncontextmenu="return false"></canvas>
+    <canvas id="canvas1" oncontextmenu="return false"></canvas>
 </body>
 </html>
