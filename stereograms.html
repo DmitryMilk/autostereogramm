@@ -9,6 +9,10 @@ screenWidthMillis = 600
 distanceToScreenMillis = 1000
 eyesDistanceMillis = 62
 
+colorRedValue = 0
+colorGreenValue = 0
+colorBlueValue = 0
+
 const depthMillis = 2000
 
 //--------------------------------------------------------------
@@ -465,6 +469,7 @@ class Pad {
         uniform sampler2D noiseTex;
         uniform float k;
         uniform float randomShift;
+        uniform vec3 color;
         
         out vec4 FragColor;
         
@@ -499,9 +504,9 @@ class Pad {
             if ( noiseCoord.x >= width ) noiseCoord.x -= width;
             float noiseRight = texelFetch(noiseTex, noiseCoord, 0).r;
             
-            float noise = (noiseLeft + noiseRight) * 0.75;
+            float noise = (noiseLeft + noiseRight - 0.5);
             
-            FragColor = vec4(noise, noise, noise, 1.0);
+            FragColor = vec4(noise + color.r, noise + color.g, noise + color.b, 1.0);
         }
     `
     
@@ -511,7 +516,7 @@ class Pad {
                 { type: "VERTEX_SHADER", src: this.vertexShaderSrc },
                 { type: "FRAGMENT_SHADER", src: this.fragmentShaderSrc },
             ],
-            uniforms: { texLeft: null, texRight: null, noiseTex: null, k: null, randomShift: null },
+            uniforms: { texLeft: null, texRight: null, noiseTex: null, k: null, randomShift: null, color: null },
             vertexSpecification: [{
                 type: "FLOAT",
                 attributes: [
@@ -581,6 +586,13 @@ class Pad {
             gl.uniform1f(this.program.uniforms.randomShift, Math.random()*gl.canvas.width/4)
         }
         
+        gl.uniform3f(
+            this.program.uniforms.color,
+            colorRedValue,
+            colorGreenValue,
+            colorBlueValue
+        )
+        
         this.drawcalls.pad_triangles.draw()
     }
 }
@@ -631,6 +643,9 @@ function updateViewParams() {
     screenWidthMillis = checkNumericParam('#screenWidth', screenWidthMillis, 10, NaN)
     distanceToScreenMillis = checkNumericParam('#distanceToScreen', distanceToScreenMillis, 10, NaN)
     eyesDistanceMillis = checkNumericParam('#eyesDistance', eyesDistanceMillis, 30, 100)
+    colorRedValue = checkNumericParam('#colorRed', colorRedValue, -1.0, 1.0)
+    colorGreenValue = checkNumericParam('#colorGreen', colorGreenValue, -1.0, 1.0)
+    colorBlueValue = checkNumericParam('#colorBlue', colorBlueValue, -1.0, 1.0)
 }
 
 //--------------------------------------------------------------
@@ -768,6 +783,14 @@ function init() {
         }
     }
     
+    for ( const paramId of ['#colorRed', '#colorGreen', '#colorBlue'] ) {
+        let element = document.querySelector(paramId)
+        element.oninput = (evt) => {
+            updateViewParams()
+            requestAnimationFrame(draw)
+        }
+    }
+    
     requestAnimationFrame(draw)
 }
 
@@ -813,11 +836,26 @@ canvas {
             <tr>
                 <td>Eyes distance (mm)</td>
                 <td><input id="eyesDistance" /></td>
+                <td>R</td>
+                <td><input type="range" id="colorRed" min="-1" max="1" step="any" /></td>
                 <td rowspan="4" id="fscell"><button id="fsbutton"><span class="underline">F</span>ullscreen</button></td>
             </tr>
-            <tr><td>Screen width (mm)</td><td><input id="screenWidth" /></td></tr>
-            <tr><td>Distance to screen (mm)</td><td><input id="distanceToScreen" /></td></tr>
-            <tr><td>Update entire canvas</td><td><input type="checkbox" id="updateEntireCanvas" /></td></tr>
+            <tr>
+                <td>Screen width (mm)</td>
+                <td><input id="screenWidth" /></td>
+                <td>G</td>
+                <td><input type="range" id="colorGreen" min="-1" max="1" step="any" /></td>
+            </tr>
+            <tr>
+                <td>Distance to screen (mm)</td>
+                <td><input id="distanceToScreen" /></td>
+                <td>B</td>
+                <td><input type="range" id="colorBlue" min="-1" max="1" step="any" /></td>
+            </tr>
+            <tr>
+                <td>Update entire canvas</td>
+                <td><input type="checkbox" id="updateEntireCanvas" /></td>
+            </tr>
         </table>
     </div>
     
