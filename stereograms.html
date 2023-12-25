@@ -702,6 +702,16 @@ function init() {
         }
     }
     
+    document.addEventListener("keydown", (evt) => {
+        if (evt.code == "KeyF") {
+            if ( document.fullscreenElement ) {
+                document.exitFullscreen()
+            } else {
+                canvas.requestFullscreen()
+            }
+        }
+    })
+    
     canvas.onwheel = (evt) => {
         const distCoef = 1.01
         if ( evt.wheelDelta > 0 && scene.distance > distanceToScreenMillis + depthMillis / 2 ) scene.distance /= distCoef
@@ -780,6 +790,10 @@ canvas {
     height: 100%;
 }
 
+.underline {
+    text-decoration: underline;
+}
+
 </style>
 
 </head>
@@ -789,7 +803,7 @@ canvas {
             <tr>
                 <td>Eyes distance (mm)</td>
                 <td><input id="eyesDistance" /></td>
-                <td rowspan="3" id="fscell"><button id="fsbutton">Fullscreen</button></td>
+                <td rowspan="3" id="fscell"><button id="fsbutton"><span class="underline">F</span>ullscreen</button></td>
             </tr>
             <tr><td>Screen width (mm)</td><td><input id="screenWidth" /></td></tr>
             <tr><td>Distance to screen (mm)</td><td><input id="distanceToScreen" /></td></tr>
