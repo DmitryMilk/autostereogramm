@@ -1580,7 +1580,7 @@ class Pad {
             if ( noiseCoord.x >= width ) noiseCoord.x -= width;
             float noiseRight = texelFetch(noiseTex, noiseCoord, 0).r;
             
-            float noise = (noiseLeft + noiseRight - 0.5);
+            float noise = (noiseLeft + noiseRight) > 1.0 ? 1.0 : 0.0;
             
             FragColor = vec4(noise + color.r, noise + color.g, noise + color.b, 1.0);
         }
