@@ -1544,6 +1544,7 @@ class Pad {
         uniform sampler2D texRight;
         uniform sampler2D noiseTex;
         uniform float k;
+        uniform float randomShift;
         uniform vec3 color;
         
         out vec4 FragColor;
@@ -1553,15 +1554,18 @@ class Pad {
         }
         
         void main() {
+            int width = textureSize(texLeft, 0).x;
+            
             // scan left to right
             ivec2 noiseCoord = ivec2(gl_FragCoord);
             int par = max(int(parallax(texelFetch(texLeft, noiseCoord, 0).r)), 1);
-            int width = textureSize(texLeft, 0).x;
             while ( noiseCoord.x + par < width ) {
                 noiseCoord.x += par;
                 par = max(int(parallax(texelFetch(texLeft, noiseCoord, 0).r)), 1);
             }
             
+            noiseCoord.x -= int(randomShift);
+            if ( noiseCoord.x < 0 ) noiseCoord.x += width;
             float noiseLeft = texelFetch(noiseTex, noiseCoord, 0).r;
             
             // scan right to left
@@ -1572,6 +1576,8 @@ class Pad {
                 par = max(int(parallax(texelFetch(texRight, noiseCoord, 0).r)), 1);
             }
             
+            noiseCoord.x += int(randomShift);
+            if ( noiseCoord.x >= width ) noiseCoord.x -= width;
             float noiseRight = texelFetch(noiseTex, noiseCoord, 0).r;
             
             float noise = (noiseLeft + noiseRight) > 1.0 ? 1.0 : 0.0;
@@ -1586,7 +1592,7 @@ class Pad {
                 { type: "VERTEX_SHADER", src: this.vertexShaderSrc },
                 { type: "FRAGMENT_SHADER", src: this.fragmentShaderSrc },
             ],
-            uniforms: { texLeft: null, texRight: null, noiseTex: null, k: null, color: null },
+            uniforms: { texLeft: null, texRight: null, noiseTex: null, k: null, randomShift: null, color: null },
             vertexSpecification: [{
                 type: "FLOAT",
                 attributes: [
@@ -1651,6 +1657,10 @@ class Pad {
             depthMillis * eyesDistanceMillis * screen.width /
                 (screenWidthMillis * (depthMillis + distanceToScreenMillis))
         )
+        
+        if ( document.querySelector('#updateEntireCanvas').checked ) {
+            gl.uniform1f(this.program.uniforms.randomShift, Math.random()*gl.canvas.width/4)
+        }
         
         gl.uniform3f(
             this.program.uniforms.color,
@@ -1904,7 +1914,7 @@ canvas {
                 <td><input id="eyesDistance" /></td>
                 <td>R</td>
                 <td><input type="range" id="colorRed" min="-1" max="1" step="any" /></td>
-                <td rowspan="3" id="fscell"><button id="fsbutton"><span class="underline">F</span>ullscreen</button></td>
+                <td rowspan="4" id="fscell"><button id="fsbutton"><span class="underline">F</span>ullscreen</button></td>
             </tr>
             <tr>
                 <td>Screen width (mm)</td>
@@ -1917,6 +1927,10 @@ canvas {
                 <td><input id="distanceToScreen" /></td>
                 <td>B</td>
                 <td><input type="range" id="colorBlue" min="-1" max="1" step="any" /></td>
+            </tr>
+            <tr>
+                <td>Update entire canvas</td>
+                <td><input type="checkbox" id="updateEntireCanvas" /></td>
             </tr>
         </table>
     </div>
