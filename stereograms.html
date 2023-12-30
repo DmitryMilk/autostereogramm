@@ -1854,6 +1854,7 @@ function init() {
         
         element.onchange = (evt) => {
             updateViewParams()
+            scene.initParams()
             pad.initParams()
             requestAnimationFrame(draw)
         }
