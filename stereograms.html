@@ -12,8 +12,7 @@ eyesDistanceMillis = 62
 colorRedValue = 0
 colorGreenValue = 0
 colorBlueValue = 0
-
-const depthMillis = 2000
+depthMillis = 1000
 
 //--------------------------------------------------------------
 /*
@@ -1731,6 +1730,7 @@ function updateViewParams() {
     screenWidthMillis = checkNumericParam('#screenWidth', screenWidthMillis, 10, NaN)
     distanceToScreenMillis = checkNumericParam('#distanceToScreen', distanceToScreenMillis, 10, NaN)
     eyesDistanceMillis = checkNumericParam('#eyesDistance', eyesDistanceMillis, 30, 100)
+    depthMillis = checkNumericParam('#depth', depthMillis, 10, NaN)
     colorRedValue = checkNumericParam('#colorRed', colorRedValue, -1.0, 1.0)
     colorGreenValue = checkNumericParam('#colorGreen', colorGreenValue, -1.0, 1.0)
     colorBlueValue = checkNumericParam('#colorBlue', colorBlueValue, -1.0, 1.0)
@@ -1858,7 +1858,7 @@ function init() {
         canvas.releasePointerCapture(evt.pointerId)
     }
     
-    for ( const paramId of ['#screenWidth', '#distanceToScreen', '#eyesDistance'] ) {
+    for ( const paramId of ['#screenWidth', '#distanceToScreen', '#eyesDistance', '#depth'] ) {
         let element = document.querySelector(paramId)
         element.oninput = (evt) => {
             element.style.background = '#FF8080'
@@ -1942,8 +1942,9 @@ canvas {
                 <td><input type="range" id="colorBlue" min="-1" max="1" step="any" /></td>
             </tr>
             <tr>
-                <td>Update entire canvas</td>
-                <td><input type="checkbox" id="updateEntireCanvas" /></td>
+                <td>Scene depth (mm)</td>
+                <td><input id="depth" /></td>
+                <td colspan="2">Update entire canvas<input type="checkbox" id="updateEntireCanvas" /></td>
             </tr>
         </table>
     </div>
