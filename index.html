@@ -5,6 +5,8 @@
 
 <script>
 
+const vsmooth = 0.7
+
 screenWidthMillis = 600
 distanceToScreenMillis = 1000
 eyesDistanceMillis = 62
@@ -1625,9 +1627,14 @@ class Pad {
     initParams() {
         let gl = this.program.gl
         let noise = new Float32Array(gl.canvas.width * gl.canvas.height)
-        for ( let i = 0; i < gl.canvas.width * gl.canvas.height; i++ ) {
+        for ( let i = 0; i < gl.canvas.width * gl.canvas.height; i+=2 ) {
             let value = Math.random()
-            noise[i] = value
+            if ( i>= gl.canvas.width ) {
+                noise[i] = value * (1 - vsmooth) + noise[i-gl.canvas.width]*vsmooth
+            } else {
+                noise[i] = value
+            }
+            noise[i+1] = noise[i]
         }
         gl.bindTexture(gl.TEXTURE_2D, this.noiseTex)
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, gl.canvas.width, gl.canvas.height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, noise)
@@ -1914,20 +1921,20 @@ canvas {
                 <td>Eyes distance (mm)</td>
                 <td><input id="eyesDistance" /></td>
                 <td>R</td>
-                <td><input type="range" id="colorRed" min="-1" max="1" step="any" /></td>
+                <td><input type="range" id="colorRed" min="-1" max="1" step="any" value="-0.1" /></td>
                 <td rowspan="4" id="fscell"><button id="fsbutton"><span class="underline">F</span>ullscreen</button></td>
             </tr>
             <tr>
                 <td>Screen width (mm)</td>
                 <td><input id="screenWidth" /></td>
                 <td>G</td>
-                <td><input type="range" id="colorGreen" min="-1" max="1" step="any" /></td>
+                <td><input type="range" id="colorGreen" min="-1" max="1" step="any" value="-0.3" /></td>
             </tr>
             <tr>
                 <td>Distance to screen (mm)</td>
                 <td><input id="distanceToScreen" /></td>
                 <td>B</td>
-                <td><input type="range" id="colorBlue" min="-1" max="1" step="any" /></td>
+                <td><input type="range" id="colorBlue" min="-1" max="1" step="any" value="-0.4" /></td>
             </tr>
             <tr>
                 <td>Scene depth (mm)</td>
